@@ -1,0 +1,2014 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ziply — Vettorializzatore</title>
+<style>
+:root {
+  --bg: #0a0a0a; --surface: #111; --surface2: #161616;
+  --border: #222; --blue: #2979ff; --blue-dim: rgba(41,121,255,0.08);
+  --text: #e8e8e8; --text-dim: #555; --text-mid: #888;
+  --radius: 13px; --checker-a: #181818;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 0 0 60px; }
+.topbar { width: 100%; display: flex; align-items: center; gap: 6px; padding: 18px 32px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+.brand { color: #555; font-size: 15px; font-weight: 400; }
+.tool  { color: #e8e8e8; font-size: 15px; font-weight: 600; }
+.wrap { width: 100%; max-width: 900px; padding: 0 28px; display: flex; flex-direction: column; gap: 0; }
+.step-label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; }
+.step-label span { color: var(--blue); margin-right: 6px; }
+.upload-row { display: flex; align-items: stretch; gap: 16px; margin-bottom: 8px; }
+.drop-zone { flex: 1; border: 1.5px dashed #2c2c2c; border-radius: var(--radius); padding: 28px 32px; cursor: pointer; position: relative; transition: border-color .2s, background .2s; display: flex; align-items: center; min-height: 96px; }
+.drop-zone:hover, .drop-zone.drag-over { border-color: var(--blue); background: var(--blue-dim); }
+.drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.drop-title { color: var(--blue); font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+.drop-sub   { color: var(--text-mid); font-size: 12px; margin-bottom: 3px; }
+.drop-types { color: #3a3a3a; font-size: 11px; }
+.file-name  { font-size: 12px; color: var(--blue); margin-top: 6px; display: none; }
+.threshold-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 14px; }
+.thr-label { font-size: 12px; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
+input[type=range] { flex: 1; accent-color: var(--blue); height: 3px; cursor: pointer; }
+.thr-val { font-size: 12px; color: var(--blue); width: 32px; text-align: right; flex-shrink: 0; }
+.status { font-size: 12px; color: var(--text-dim); margin-bottom: 14px; min-height: 16px; transition: color .3s; }
+.status.ok  { color: #30d158; }
+.status.err { color: #ff453a; }
+.actions { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; justify-content: center; }
+.btn { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 0 22px; height: 44px; border-radius: 10px; border: none; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s, background .15s; white-space: nowrap; min-width: 156px; text-decoration: none; }
+.btn:active { transform: scale(0.97); }
+.btn-blue { background: var(--blue); color: #fff; }
+.btn-blue:hover { background: #1a6aff; }
+.btn-gray { background: #1a1a1a; color: #3a3a3a; border: 1px solid #222; cursor: not-allowed; }
+.btn-gray.ready { color: var(--blue); cursor: pointer; }
+.btn-gray.ready:hover { background: #1e1e1e; }
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.panel-header { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); padding: 11px 18px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+.panel-body { min-height: 320px; display: flex; align-items: center; justify-content: center; position: relative; background-image: linear-gradient(45deg,var(--checker-a) 25%,transparent 25%), linear-gradient(-45deg,var(--checker-a) 25%,transparent 25%), linear-gradient(45deg,transparent 75%,var(--checker-a) 75%), linear-gradient(-45deg,transparent 75%,var(--checker-a) 75%); background-size: 18px 18px; background-position: 0 0,0 9px,9px -9px,-9px 0; transition: background .3s; }
+.panel-body.white-bg { background-image: none; background-color: #fff; }
+.panel-placeholder { color: #333; font-size: 13px; text-align: center; padding: 20px; line-height: 1.6; }
+.panel-placeholder svg { opacity: .3; margin-bottom: 10px; }
+#bwOutput { max-width: 90%; max-height: 300px; display: none; object-fit: contain; padding: 16px; }
+#vecOutput { width: 90%; max-height: 300px; display: none; padding: 16px; overflow: hidden; }
+#vecOutput svg { width: 100% !important; height: auto !important; max-height: 268px; display: block; }
+.divider { height: 1px; background: var(--border); margin: 8px 0 24px; }
+.vpath { cursor: pointer; transition: filter .15s; }
+.vpath:hover { filter: drop-shadow(0 0 3px rgba(41,121,255,0.7)); }
+.vpath.selected { outline: none; filter: drop-shadow(0 0 4px #2979ff) drop-shadow(0 0 8px rgba(41,121,255,0.5)); }
+.swatch { width: 28px; height: 28px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; transition: border-color .15s, transform .1s; flex-shrink:0; }
+.swatch:hover { border-color: #fff; transform: scale(1.1); }
+#vecPanel { position: relative; }
+#rubberBand { position: absolute; border: 1.5px dashed #2979ff; background: rgba(41,121,255,0.08); pointer-events: none; display: none; border-radius: 2px; z-index: 10; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="tool">Vettorializzatore</span>
+</div>
+
+<div class="wrap">
+
+  <div class="step-label"><span>01</span>Carica immagine</div>
+  <div class="upload-row">
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="image/*">
+      <div class="drop-content">
+        <div class="drop-title">Carica Immagine</div>
+        <div class="drop-sub">Drag and drop oppure clicca</div>
+        <div class="drop-types">PNG · JPG · WebP · GIF · BMP</div>
+        <div class="file-name" id="fileName"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-blue" id="btnConvert">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        Estrai Forme
+      </button>
+      <button class="btn btn-blue" id="btnVectorize" style="opacity:.38;pointer-events:none">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+        Vettorializza
+      </button>
+      <a class="btn btn-gray" id="btnExport">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Esporta SVG
+      </a>
+    </div>
+  </div>
+
+  <div class="step-label"><span>02</span>Soglia di estrazione</div>
+  <div class="threshold-panel">
+    <span class="thr-label">Soglia (0 = auto)</span>
+    <input type="range" id="thresholdSlider" min="0" max="255" value="0">
+    <span class="thr-val" id="thresholdVal">Auto</span>
+  </div>
+
+
+  <div class="status" id="status">Carica un'immagine per iniziare.</div>
+  <div class="divider"></div>
+
+  <div class="step-label"><span>03</span>Anteprima</div>
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-header">Forme estratte (B&amp;N)</div>
+      <div class="panel-body" id="bwPanel">
+        <div class="panel-placeholder" id="bwPlaceholder">
+          <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <div>Clicca "Estrai Forme"</div>
+        </div>
+        <img id="bwOutput" alt="Forme estratte">
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">Vettoriale SVG</div>
+      <div class="panel-body" id="vecPanel"><div id="rubberBand"></div>
+        <div class="panel-placeholder" id="vecPlaceholder">
+          <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+          <div>Clicca "Vettorializza"<br>dopo l'estrazione</div>
+        </div>
+        <div id="vecOutput"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Editor colori — appare dopo vettorializzazione -->
+  <div id="colorEditor" style="display:none; margin-bottom:20px;">
+    <div class="step-label"><span>04</span>Colora elementi</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+      <div style="font-size:12px;color:var(--text-mid);margin-bottom:14px;">Clicca una forma nel vettoriale per selezionarla, poi scegli il colore.</div>
+      <div id="colorHint" style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Nessuna forma selezionata</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <!-- Palette rapida -->
+        <div id="paletteLabel" style="font-size:11px;color:var(--text-dim);width:100%;margin-bottom:2px;">Palette:</div>
+        <div id="palette" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <!-- Custom color -->
+        <input type="color" id="customColor" value="#000000" style="width:36px;height:36px;border:none;border-radius:8px;cursor:pointer;background:none;padding:0;">
+        <!-- Bottone Trasparente -->
+        <button id="btnTransparent" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text-mid);font-size:12px;cursor:pointer;font-family:inherit;">Trasparente</button>
+        <!-- Ripristina -->
+        <button id="btnResetColors" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text-mid);font-size:12px;cursor:pointer;font-family:inherit;">Reset colori</button>
+      </div>
+    </div>
+  </div>
+
+
+
+<script>
+var Potrace = (function() {
+
+  function Point(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+  
+  Point.prototype.copy = function(){
+    return new Point(this.x, this.y);
+  };
+
+  function Bitmap(w, h) {
+    this.w = w;
+    this.h = h;
+    this.size = w * h;
+    this.arraybuffer = new ArrayBuffer(this.size);
+    this.data = new Int8Array(this.arraybuffer);
+  }
+
+  Bitmap.prototype.at = function (x, y) {
+    return (x >= 0 && x < this.w && y >=0 && y < this.h) && 
+        this.data[this.w * y + x] === 1;
+  };
+
+  Bitmap.prototype.index = function(i) {
+    var point = new Point();
+    point.y = Math.floor(i / this.w);
+    point.x = i - point.y * this.w;
+    return point;
+  };
+
+  Bitmap.prototype.flip = function(x, y) {
+    if (this.at(x, y)) {
+      this.data[this.w * y + x] = 0;
+    } else {
+      this.data[this.w * y + x] = 1;
+    }
+  };
+    
+  Bitmap.prototype.copy = function() {
+    var bm = new Bitmap(this.w, this.h), i;
+    for (i = 0; i < this.size; i++) {
+      bm.data[i] = this.data[i];
+    }
+    return bm;
+  };
+
+  function Path() {
+    this.area = 0;
+    this.len = 0;
+    this.curve = {};
+    this.pt = [];
+    this.minX = 100000;
+    this.minY = 100000;
+    this.maxX= -1;
+    this.maxY = -1;
+  }
+
+  function Curve(n) {
+    this.n = n;
+    this.tag = new Array(n);
+    this.c = new Array(n * 3);
+    this.alphaCurve = 0;
+    this.vertex = new Array(n);
+    this.alpha = new Array(n);
+    this.alpha0 = new Array(n);
+    this.beta = new Array(n);
+  }
+
+  var imgElement = document.createElement("img"),
+      imgCanvas = document.createElement("canvas"),
+      bm = null,
+      pathlist = [],
+      callback,
+      info = {
+        isReady: false,
+        turnpolicy: "minority", 
+        turdsize: 2,
+        optcurve: true,
+        alphamax: 1,
+        opttolerance: 0.2
+      };
+
+  imgElement.onload = function() {
+    loadCanvas();
+    loadBm();
+  };
+
+  function loadImageFromFile(file) {
+    if (info.isReady) {
+      clear();
+    }
+    imgElement.file = file;
+    var reader = new FileReader();
+    reader.onload = (function(aImg) {
+      return function(e) {
+        aImg.src = e.target.result;
+      };
+    })(imgElement);
+    reader.readAsDataURL(file);
+  }
+  
+  function loadImageFromUrl(url) {
+    if (info.isReady) {
+      clear();
+    }
+    imgElement.src = url;
+    
+  }
+  
+  function setParameter(obj) {
+   var key;
+   for (key in obj) {
+     if (obj.hasOwnProperty(key)) {
+       info[key] = obj[key];
+     }
+    }
+  }
+  
+  function loadCanvas() {
+    imgCanvas.width = imgElement.width;
+    imgCanvas.height = imgElement.height;
+    var ctx = imgCanvas.getContext('2d');
+    ctx.drawImage(imgElement, 0, 0);
+  }
+  
+  function loadBm() {
+    var ctx = imgCanvas.getContext('2d');
+    bm = new Bitmap(imgCanvas.width, imgCanvas.height);
+    var imgdataobj = ctx.getImageData(0, 0, bm.w, bm.h);
+    var l = imgdataobj.data.length, i, j, color;
+    for (i = 0, j = 0; i < l; i += 4, j++) {
+      color = 0.2126 * imgdataobj.data[i] + 0.7153 * imgdataobj.data[i + 1] +
+          0.0721 * imgdataobj.data[i + 2];
+      bm.data[j] = (color < 128 ? 1 : 0);
+    }
+    info.isReady = true;
+  }
+  
+  
+  function bmToPathlist() {
+  
+    var bm1 = bm.copy(),
+      currentPoint = new Point(0, 0),
+      path;
+    
+    function findNext(point) {
+      var i = bm1.w * point.y + point.x;
+      while (i < bm1.size && bm1.data[i] !== 1) {
+        i++;
+      }
+      return i < bm1.size && bm1.index(i);
+    }
+    
+    function majority(x, y) {
+      var i, a, ct;
+      for (i = 2; i < 5; i++) {
+        ct = 0;
+        for (a = -i + 1; a <= i - 1; a++) {
+          ct += bm1.at(x + a, y + i - 1) ? 1 : -1;
+          ct += bm1.at(x + i - 1, y + a - 1) ? 1 : -1;
+          ct += bm1.at(x + a - 1, y - i) ? 1 : -1;
+          ct += bm1.at(x - i, y + a) ? 1 : -1;
+        }
+        if (ct > 0) {
+          return 1;
+        } else if (ct < 0) {
+          return 0;
+        }
+      }
+      return 0;
+    }
+    
+    function findPath(point) {
+      var path = new Path(),
+        x = point.x, y = point.y,
+        dirx = 0, diry = 1, tmp;
+      
+      path.sign = bm.at(point.x, point.y) ? "+" : "-";
+      
+      while (1) {
+        path.pt.push(new Point(x, y));
+        if (x > path.maxX)
+          path.maxX = x;
+        if (x < path.minX)
+          path.minX = x;
+        if (y > path.maxY)
+          path.maxY = y;
+        if (y < path.minY)
+          path.minY = y;
+        path.len++;
+        
+        x += dirx;
+        y += diry;
+        path.area -= x * diry;
+        
+        if (x === point.x && y === point.y)
+          break;
+        
+        var l = bm1.at(x + (dirx + diry - 1 ) / 2, y + (diry - dirx - 1) / 2);
+        var r = bm1.at(x + (dirx - diry - 1) / 2, y + (diry + dirx - 1) / 2);
+        
+        if (r && !l) {
+          if (info.turnpolicy === "right" ||
+          (info.turnpolicy === "black" && path.sign === '+') ||
+          (info.turnpolicy === "white" && path.sign === '-') ||
+          (info.turnpolicy === "majority" && majority(x, y)) ||
+          (info.turnpolicy === "minority" && !majority(x, y))) {
+            tmp = dirx;
+            dirx = -diry;
+            diry = tmp;
+          } else {
+            tmp = dirx;
+            dirx = diry;
+            diry = -tmp;
+          }
+        } else if (r) {
+          tmp = dirx;
+          dirx = -diry;
+          diry = tmp;
+        } else if (!l) {
+          tmp = dirx;
+          dirx = diry;
+          diry = -tmp;
+        }
+      }
+      return path;
+    }
+    
+    function xorPath(path){
+      var y1 = path.pt[0].y,
+        len = path.len,
+        x, y, maxX, minY, i, j;
+      for (i = 1; i < len; i++) {
+        x = path.pt[i].x;
+        y = path.pt[i].y;
+        
+        if (y !== y1) {
+          minY = y1 < y ? y1 : y;
+          maxX = path.maxX;
+          for (j = x; j < maxX; j++) {
+            bm1.flip(j, minY);
+          }
+          y1 = y;
+        }
+      }
+      
+    }
+    
+    while (currentPoint = findNext(currentPoint)) {
+
+      path = findPath(currentPoint);
+      
+      xorPath(path);
+      
+      if (path.area > info.turdsize) {
+        pathlist.push(path);
+      }
+    }
+    
+  }
+  
+
+  function processPath() {
+  
+    function Quad() {
+      this.data = [0,0,0,0,0,0,0,0,0];
+    }
+
+    Quad.prototype.at = function(x, y) {
+      return this.data[x * 3 + y];
+    };
+    
+    function Sum(x, y, xy, x2, y2) {
+      this.x = x;
+      this.y = y;
+      this.xy = xy;
+      this.x2 = x2;
+      this.y2 = y2;
+    }
+    
+    function mod(a, n) {
+        return a >= n ? a % n : a>=0 ? a : n-1-(-1-a) % n;
+    }
+  
+    function xprod(p1, p2) {
+      return p1.x * p2.y - p1.y * p2.x;
+    }
+    
+    function cyclic(a, b, c) {
+      if (a <= c) {
+        return (a <= b && b < c);
+      } else {
+        return (a <= b || b < c);
+      }
+    }
+      
+    function sign(i) {
+      return i > 0 ? 1 : i < 0 ? -1 : 0;
+    }
+    
+    function quadform(Q, w) {
+      var v = new Array(3), i, j, sum;
+    
+      v[0] = w.x;
+      v[1] = w.y;
+      v[2] = 1;
+      sum = 0.0;
+    
+      for (i=0; i<3; i++) {
+        for (j=0; j<3; j++) {
+          sum += v[i] * Q.at(i, j) * v[j];
+        }
+      }
+      return sum;
+    }
+  
+    function interval(lambda, a, b) {
+      var res = new Point();
+    
+      res.x = a.x + lambda * (b.x - a.x);
+      res.y = a.y + lambda * (b.y - a.y);
+      return res;
+    }
+    
+    function dorth_infty(p0, p2) {
+      var r = new Point();
+      
+      r.y = sign(p2.x - p0.x);
+      r.x = -sign(p2.y - p0.y);
+    
+      return r;
+    }
+    
+    function ddenom(p0, p2) {
+      var r = dorth_infty(p0, p2);
+    
+      return r.y * (p2.x - p0.x) - r.x * (p2.y - p0.y);
+    }
+    
+    function dpara(p0, p1, p2) {
+      var x1, y1, x2, y2;
+    
+      x1 = p1.x - p0.x;
+      y1 = p1.y - p0.y;
+      x2 = p2.x - p0.x;
+      y2 = p2.y - p0.y;
+    
+      return x1 * y2 - x2 * y1;
+    }
+    
+    function cprod(p0, p1, p2, p3) {
+      var x1, y1, x2, y2;
+    
+      x1 = p1.x - p0.x;
+      y1 = p1.y - p0.y;
+      x2 = p3.x - p2.x;
+      y2 = p3.y - p2.y;
+    
+      return x1 * y2 - x2 * y1;
+    }
+      
+    function iprod(p0, p1, p2) {
+      var x1, y1, x2, y2;
+    
+      x1 = p1.x - p0.x;
+      y1 = p1.y - p0.y;
+      x2 = p2.x - p0.x;
+      y2 = p2.y - p0.y;
+    
+      return x1*x2 + y1*y2;
+    }
+      
+    function iprod1(p0, p1, p2, p3) {
+      var x1, y1, x2, y2;
+    
+      x1 = p1.x - p0.x;
+      y1 = p1.y - p0.y;
+      x2 = p3.x - p2.x;
+      y2 = p3.y - p2.y;
+    
+      return x1 * x2 + y1 * y2;
+    }
+    
+    function ddist(p, q) {
+      return Math.sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y));
+    }
+    
+    function bezier(t, p0, p1, p2, p3) {
+      var s = 1 - t, res = new Point();
+    
+      res.x = s*s*s*p0.x + 3*(s*s*t)*p1.x + 3*(t*t*s)*p2.x + t*t*t*p3.x;
+      res.y = s*s*s*p0.y + 3*(s*s*t)*p1.y + 3*(t*t*s)*p2.y + t*t*t*p3.y;
+    
+      return res;
+    }
+  
+    function tangent(p0, p1, p2, p3, q0, q1) {
+      var A, B, C, a, b, c, d, s, r1, r2;
+    
+      A = cprod(p0, p1, q0, q1);
+      B = cprod(p1, p2, q0, q1);
+      C = cprod(p2, p3, q0, q1);
+    
+      a = A - 2 * B + C;
+      b = -2 * A + 2 * B;
+      c = A;
+      
+      d = b * b - 4 * a * c;
+    
+      if (a===0 || d<0) {
+        return -1.0;
+      }
+    
+      s = Math.sqrt(d);
+    
+      r1 = (-b + s) / (2 * a);
+      r2 = (-b - s) / (2 * a);
+    
+      if (r1 >= 0 && r1 <= 1) {
+        return r1;
+      } else if (r2 >= 0 && r2 <= 1) {
+        return r2;
+      } else {
+        return -1.0;
+      }
+    }
+    
+    function calcSums(path) {
+      var i, x, y;
+      path.x0 = path.pt[0].x;
+      path.y0 = path.pt[0].y;
+      
+      path.sums = [];
+      var s = path.sums;
+      s.push(new Sum(0, 0, 0, 0, 0));
+      for(i = 0; i < path.len; i++){
+        x = path.pt[i].x - path.x0;
+        y = path.pt[i].y - path.y0;
+        s.push(new Sum(s[i].x + x, s[i].y + y, s[i].xy + x * y,
+            s[i].x2 + x * x, s[i].y2 + y * y));
+      }
+    }
+   
+    function calcLon(path) {
+      
+      var n = path.len, pt = path.pt, dir,
+        pivk = new Array(n),
+        nc = new Array(n),
+        ct = new Array(4);
+      path.lon = new Array(n);
+      
+      var constraint = [new Point(), new Point()],
+          cur = new Point(),
+          off = new Point(),
+          dk = new Point(),
+          foundk;
+      
+      var i, j, k1, a, b, c, d, k = 0;
+      for(i = n - 1; i >= 0; i--){
+        if (pt[i].x != pt[k].x && pt[i].y != pt[k].y) {
+          k = i + 1;
+        }
+        nc[i] = k;
+      }
+      
+      for (i = n - 1; i >= 0; i--) {
+        ct[0] = ct[1] = ct[2] = ct[3] = 0;
+        dir = (3 + 3 * (pt[mod(i + 1, n)].x - pt[i].x) + 
+            (pt[mod(i + 1, n)].y - pt[i].y)) / 2;
+        ct[dir]++;
+        
+        constraint[0].x = 0;
+        constraint[0].y = 0;
+        constraint[1].x = 0;
+        constraint[1].y = 0;
+        
+        k = nc[i];
+        k1 = i;
+        while (1) {
+          foundk = 0;
+          dir =  (3 + 3 * sign(pt[k].x - pt[k1].x) + 
+              sign(pt[k].y - pt[k1].y)) / 2;
+          ct[dir]++;
+          
+          if (ct[0] && ct[1] && ct[2] && ct[3]) {
+            pivk[i] = k1;
+            foundk = 1;
+            break;
+          }
+          
+          cur.x = pt[k].x - pt[i].x;
+          cur.y = pt[k].y - pt[i].y;
+          
+          if (xprod(constraint[0], cur) < 0 || xprod(constraint[1], cur) > 0) {
+            break;
+          }
+              
+          if (Math.abs(cur.x) <= 1 && Math.abs(cur.y) <= 1) {
+          
+          } else {
+            off.x = cur.x + ((cur.y >= 0 && (cur.y > 0 || cur.x < 0)) ? 1 : -1);
+            off.y = cur.y + ((cur.x <= 0 && (cur.x < 0 || cur.y < 0)) ? 1 : -1);
+            if (xprod(constraint[0], off) >= 0) {
+              constraint[0].x = off.x;
+              constraint[0].y = off.y;
+            }
+            off.x = cur.x + ((cur.y <= 0 && (cur.y < 0 || cur.x < 0)) ? 1 : -1);
+            off.y = cur.y + ((cur.x >= 0 && (cur.x > 0 || cur.y < 0)) ? 1 : -1);
+            if (xprod(constraint[1], off) <= 0) {
+              constraint[1].x = off.x;
+              constraint[1].y = off.y;
+            }
+          }
+          k1 = k;
+          k = nc[k1];
+          if (!cyclic(k, i, k1)) {
+            break;
+          }
+        }
+        if (foundk === 0) {
+          dk.x = sign(pt[k].x-pt[k1].x);
+          dk.y = sign(pt[k].y-pt[k1].y);
+          cur.x = pt[k1].x - pt[i].x;
+          cur.y = pt[k1].y - pt[i].y;
+  
+          a = xprod(constraint[0], cur);
+          b = xprod(constraint[0], dk);
+          c = xprod(constraint[1], cur);
+          d = xprod(constraint[1], dk);
+  
+          j = 10000000;
+          if (b < 0) {
+            j = Math.floor(a / -b);
+          }
+          if (d > 0) {
+            j = Math.min(j, Math.floor(-c / d));
+          }
+          pivk[i] = mod(k1+j,n);
+        }
+      }
+      
+      j=pivk[n-1];
+      path.lon[n-1]=j;
+      for (i=n-2; i>=0; i--) {
+        if (cyclic(i+1,pivk[i],j)) {
+          j=pivk[i];
+        }
+        path.lon[i]=j;
+      }
+  
+      for (i=n-1; cyclic(mod(i+1,n),j,path.lon[i]); i--) {
+        path.lon[i] = j;
+      }
+    }
+    
+    function bestPolygon(path) {
+      
+      function penalty3(path, i, j) {
+        
+        var n = path.len, pt = path.pt, sums = path.sums;
+        var x, y, xy, x2, y2,
+          k, a, b, c, s,
+          px, py, ex, ey,
+          r = 0;
+        if (j>=n) {
+          j -= n;
+          r = 1;
+        }
+        
+        if (r === 0) {
+          x = sums[j+1].x - sums[i].x;
+          y = sums[j+1].y - sums[i].y;
+          x2 = sums[j+1].x2 - sums[i].x2;
+          xy = sums[j+1].xy - sums[i].xy;
+          y2 = sums[j+1].y2 - sums[i].y2;
+          k = j+1 - i;
+        } else {
+          x = sums[j+1].x - sums[i].x + sums[n].x;
+          y = sums[j+1].y - sums[i].y + sums[n].y;
+          x2 = sums[j+1].x2 - sums[i].x2 + sums[n].x2;
+          xy = sums[j+1].xy - sums[i].xy + sums[n].xy;
+          y2 = sums[j+1].y2 - sums[i].y2 + sums[n].y2;
+          k = j+1 - i + n;
+        } 
+      
+        px = (pt[i].x + pt[j].x) / 2.0 - pt[0].x;
+        py = (pt[i].y + pt[j].y) / 2.0 - pt[0].y;
+        ey = (pt[j].x - pt[i].x);
+        ex = -(pt[j].y - pt[i].y);
+      
+        a = ((x2 - 2*x*px) / k + px*px);
+        b = ((xy - x*py - y*px) / k + px*py);
+        c = ((y2 - 2*y*py) / k + py*py);
+        
+        s = ex*ex*a + 2*ex*ey*b + ey*ey*c;
+      
+        return Math.sqrt(s);
+      }
+      
+      var i, j, m, k,    
+      n = path.len,
+      pen = new Array(n + 1),
+      prev = new Array(n + 1),
+      clip0 = new Array(n),
+      clip1 = new Array(n + 1),
+      seg0 = new Array (n + 1),
+      seg1 = new Array(n + 1),
+      thispen, best, c;
+      
+      for (i=0; i<n; i++) {
+        c = mod(path.lon[mod(i-1,n)]-1,n);
+        if (c == i) {
+          c = mod(i+1,n);
+        }
+        if (c < i) {
+          clip0[i] = n;
+        } else {
+          clip0[i] = c;
+        }
+      }
+      
+      j = 1;
+      for (i=0; i<n; i++) {
+        while (j <= clip0[i]) {
+          clip1[j] = i;
+          j++;
+        }
+      }
+      
+      i = 0;
+      for (j=0; i<n; j++) {
+        seg0[j] = i;
+        i = clip0[i];
+      }
+      seg0[j] = n;
+      m = j;
+    
+      i = n;
+      for (j=m; j>0; j--) {
+        seg1[j] = i;
+        i = clip1[i];
+      }
+      seg1[0] = 0;
+      
+      pen[0]=0;
+      for (j=1; j<=m; j++) {
+        for (i=seg1[j]; i<=seg0[j]; i++) {
+          best = -1;
+          for (k=seg0[j-1]; k>=clip1[i]; k--) {
+            thispen = penalty3(path, k, i) + pen[k];
+            if (best < 0 || thispen < best) {
+              prev[i] = k;
+              best = thispen;
+            }
+          }
+          pen[i] = best;
+        }
+      }
+      path.m = m;
+      path.po = new Array(m);
+    
+      for (i=n, j=m-1; i>0; j--) {
+        i = prev[i];
+        path.po[j] = i;
+      }
+    }
+    
+    function adjustVertices(path) {
+      
+      function pointslope(path, i, j, ctr, dir) {
+    
+        var n = path.len, sums = path.sums,
+          x, y, x2, xy, y2,
+          k, a, b, c, lambda2, l, r=0;
+      
+        while (j>=n) {
+          j-=n;
+          r+=1;
+        }
+        while (i>=n) {
+          i-=n;
+          r-=1;
+        }
+        while (j<0) {
+          j+=n;
+          r-=1;
+        }
+        while (i<0) {
+          i+=n;
+          r+=1;
+        }
+        
+        x = sums[j+1].x-sums[i].x+r*sums[n].x;
+        y = sums[j+1].y-sums[i].y+r*sums[n].y;
+        x2 = sums[j+1].x2-sums[i].x2+r*sums[n].x2;
+        xy = sums[j+1].xy-sums[i].xy+r*sums[n].xy;
+        y2 = sums[j+1].y2-sums[i].y2+r*sums[n].y2;
+        k = j+1-i+r*n;
+        
+        ctr.x = x/k;
+        ctr.y = y/k;
+      
+        a = (x2-x*x/k)/k;
+        b = (xy-x*y/k)/k;
+        c = (y2-y*y/k)/k;
+        
+        lambda2 = (a+c+Math.sqrt((a-c)*(a-c)+4*b*b))/2;
+      
+        a -= lambda2;
+        c -= lambda2;
+      
+        if (Math.abs(a) >= Math.abs(c)) {
+          l = Math.sqrt(a*a+b*b);
+          if (l!==0) {
+            dir.x = -b/l;
+            dir.y = a/l;
+          }
+        } else {
+          l = Math.sqrt(c*c+b*b);
+          if (l!==0) {
+            dir.x = -c/l;
+            dir.y = b/l;
+          }
+        }
+        if (l===0) {
+          dir.x = dir.y = 0; 
+        }
+      }
+      
+      var m = path.m, po = path.po, n = path.len, pt = path.pt,
+        x0 = path.x0, y0 = path.y0,
+        ctr = new Array(m), dir = new Array(m),
+        q = new Array(m),
+        v = new Array(3), d, i, j, k, l,
+        s = new Point();
+      
+      path.curve = new Curve(m);
+  
+      for (i=0; i<m; i++) {
+        j = po[mod(i+1,m)];
+        j = mod(j-po[i],n)+po[i];
+        ctr[i] = new Point();
+        dir[i] = new Point();
+        pointslope(path, po[i], j, ctr[i], dir[i]);
+      }
+    
+      for (i=0; i<m; i++) {
+        q[i] = new Quad();
+        d = dir[i].x * dir[i].x + dir[i].y * dir[i].y;
+        if (d === 0.0) {
+          for (j=0; j<3; j++) {
+            for (k=0; k<3; k++) {
+              q[i].data[j * 3 + k] = 0;
+            }
+          }
+        } else {
+          v[0] = dir[i].y;
+          v[1] = -dir[i].x;
+          v[2] = - v[1] * ctr[i].y - v[0] * ctr[i].x;
+          for (l=0; l<3; l++) {
+            for (k=0; k<3; k++) {
+              q[i].data[l * 3 + k] = v[l] * v[k] / d;
+            }
+          }
+        }
+      }
+     
+      var Q, w, dx, dy, det, min, cand, xmin, ymin, z;
+      for (i=0; i<m; i++) {
+        Q = new Quad();
+        w = new Point();
+    
+        s.x = pt[po[i]].x-x0;
+        s.y = pt[po[i]].y-y0;
+    
+        j = mod(i-1,m);
+        
+        for (l=0; l<3; l++) {
+          for (k=0; k<3; k++) {
+            Q.data[l * 3 + k] = q[j].at(l, k) + q[i].at(l, k);
+          }
+        }
+        
+        while(1) {
+          
+          det = Q.at(0, 0)*Q.at(1, 1) - Q.at(0, 1)*Q.at(1, 0);
+          if (det !== 0.0) {
+            w.x = (-Q.at(0, 2)*Q.at(1, 1) + Q.at(1, 2)*Q.at(0, 1)) / det;
+            w.y = ( Q.at(0, 2)*Q.at(1, 0) - Q.at(1, 2)*Q.at(0, 0)) / det;
+            break;
+          }
+    
+          if (Q.at(0, 0)>Q.at(1, 1)) {
+            v[0] = -Q.at(0, 1);
+            v[1] = Q.at(0, 0);
+          } else if (Q.at(1, 1)) {
+            v[0] = -Q.at(1, 1);
+            v[1] = Q.at(1, 0);
+          } else {
+            v[0] = 1;
+            v[1] = 0;
+          }
+          d = v[0] * v[0] + v[1] * v[1];
+          v[2] = - v[1] * s.y - v[0] * s.x;
+          for (l=0; l<3; l++) {
+            for (k=0; k<3; k++) {
+              Q.data[l * 3 + k] += v[l] * v[k] / d;
+            }
+          }
+        }
+        dx = Math.abs(w.x-s.x);
+        dy = Math.abs(w.y-s.y);
+        if (dx <= 0.5 && dy <= 0.5) {
+          path.curve.vertex[i] = new Point(w.x+x0, w.y+y0);
+          continue;
+        }
+    
+        min = quadform(Q, s);
+        xmin = s.x;
+        ymin = s.y;
+    
+        if (Q.at(0, 0) !== 0.0) {
+          for (z=0; z<2; z++) {
+            w.y = s.y-0.5+z;
+            w.x = - (Q.at(0, 1) * w.y + Q.at(0, 2)) / Q.at(0, 0);
+            dx = Math.abs(w.x-s.x);
+            cand = quadform(Q, w);
+            if (dx <= 0.5 && cand < min) {
+              min = cand;
+              xmin = w.x;
+              ymin = w.y;
+            }
+          }
+        }
+  
+        if (Q.at(1, 1) !== 0.0) {
+          for (z=0; z<2; z++) {
+            w.x = s.x-0.5+z;
+            w.y = - (Q.at(1, 0) * w.x + Q.at(1, 2)) / Q.at(1, 1);
+            dy = Math.abs(w.y-s.y);
+            cand = quadform(Q, w);
+            if (dy <= 0.5 && cand < min) {
+              min = cand;
+              xmin = w.x;
+              ymin = w.y;
+            }
+          }
+        }
+  
+        for (l=0; l<2; l++) {
+          for (k=0; k<2; k++) {
+            w.x = s.x-0.5+l;
+            w.y = s.y-0.5+k;
+            cand = quadform(Q, w);
+            if (cand < min) {
+              min = cand;
+              xmin = w.x;
+              ymin = w.y;
+            }
+          }
+        }
+    
+        path.curve.vertex[i] = new Point(xmin + x0, ymin + y0);
+      }
+    }
+    
+    function reverse(path) {
+      var curve = path.curve, m = curve.n, v = curve.vertex, i, j, tmp;
+    
+      for (i=0, j=m-1; i<j; i++, j--) {
+        tmp = v[i];
+        v[i] = v[j];
+        v[j] = tmp;
+      }
+    }
+    
+    function smooth(path) {
+      var m = path.curve.n, curve = path.curve;
+
+      var i, j, k, dd, denom, alpha,
+        p2, p3, p4;
+    
+      for (i=0; i<m; i++) {
+        j = mod(i+1, m);
+        k = mod(i+2, m);
+        p4 = interval(1/2.0, curve.vertex[k], curve.vertex[j]);
+    
+        denom = ddenom(curve.vertex[i], curve.vertex[k]);
+        if (denom !== 0.0) {
+          dd = dpara(curve.vertex[i], curve.vertex[j], curve.vertex[k]) / denom;
+          dd = Math.abs(dd);
+          alpha = dd>1 ? (1 - 1.0/dd) : 0;
+          alpha = alpha / 0.75;
+        } else {
+          alpha = 4/3.0;
+        }
+        curve.alpha0[j] = alpha;
+    
+        if (alpha >= info.alphamax) { 
+          curve.tag[j] = "CORNER";
+          curve.c[3 * j + 1] = curve.vertex[j];
+          curve.c[3 * j + 2] = p4;
+        } else {
+          if (alpha < 0.55) {
+            alpha = 0.55;
+          } else if (alpha > 1) {
+            alpha = 1;
+          }
+          p2 = interval(0.5+0.5*alpha, curve.vertex[i], curve.vertex[j]);
+          p3 = interval(0.5+0.5*alpha, curve.vertex[k], curve.vertex[j]);
+          curve.tag[j] = "CURVE";
+          curve.c[3 * j + 0] = p2;
+          curve.c[3 * j + 1] = p3;
+          curve.c[3 * j + 2] = p4;
+        }
+        curve.alpha[j] = alpha;  
+        curve.beta[j] = 0.5;
+      }
+      curve.alphacurve = 1;
+    }
+    
+    function optiCurve(path) {
+      function Opti(){
+        this.pen = 0;
+        this.c = [new Point(), new Point()];
+        this.t = 0;
+        this.s = 0;
+        this.alpha = 0;
+      }
+      
+      function opti_penalty(path, i, j, res, opttolerance, convc, areac) {
+        var m = path.curve.n, curve = path.curve, vertex = curve.vertex, 
+          k, k1, k2, conv, i1,
+          area, alpha, d, d1, d2,
+          p0, p1, p2, p3, pt,
+          A, R, A1, A2, A3, A4,
+          s, t;
+      
+        if (i==j) {
+          return 1;
+        }
+      
+        k = i;
+        i1 = mod(i+1, m);
+        k1 = mod(k+1, m);
+        conv = convc[k1];
+        if (conv === 0) {
+          return 1;
+        }
+        d = ddist(vertex[i], vertex[i1]);
+        for (k=k1; k!=j; k=k1) {
+          k1 = mod(k+1, m);
+          k2 = mod(k+2, m);
+          if (convc[k1] != conv) {
+            return 1;
+          }
+          if (sign(cprod(vertex[i], vertex[i1], vertex[k1], vertex[k2])) !=
+              conv) {
+            return 1;
+          }
+          if (iprod1(vertex[i], vertex[i1], vertex[k1], vertex[k2]) <
+              d * ddist(vertex[k1], vertex[k2]) * -0.999847695156) {
+            return 1;
+          }
+        }
+    
+        p0 = curve.c[mod(i,m) * 3 + 2].copy();
+        p1 = vertex[mod(i+1,m)].copy();
+        p2 = vertex[mod(j,m)].copy();
+        p3 = curve.c[mod(j,m) * 3 + 2].copy();
+      
+        area = areac[j] - areac[i];
+        area -= dpara(vertex[0], curve.c[i * 3 + 2], curve.c[j * 3 + 2])/2;
+        if (i>=j) {
+          area += areac[m];
+        }
+      
+        A1 = dpara(p0, p1, p2);
+        A2 = dpara(p0, p1, p3);
+        A3 = dpara(p0, p2, p3);
+  
+        A4 = A1+A3-A2;    
+        
+        if (A2 == A1) {
+          return 1;
+        }
+      
+        t = A3/(A3-A4);
+        s = A2/(A2-A1);
+        A = A2 * t / 2.0;
+        
+        if (A === 0.0) {
+          return 1;
+        }
+      
+        R = area / A;
+        alpha = 2 - Math.sqrt(4 - R / 0.3);
+      
+        res.c[0] = interval(t * alpha, p0, p1);
+        res.c[1] = interval(s * alpha, p3, p2);
+        res.alpha = alpha;
+        res.t = t;
+        res.s = s;
+      
+        p1 = res.c[0].copy();
+        p2 = res.c[1].copy(); 
+      
+        res.pen = 0;
+      
+        for (k=mod(i+1,m); k!=j; k=k1) {
+          k1 = mod(k+1,m);
+          t = tangent(p0, p1, p2, p3, vertex[k], vertex[k1]);
+          if (t<-0.5) {
+            return 1;
+          }
+          pt = bezier(t, p0, p1, p2, p3);
+          d = ddist(vertex[k], vertex[k1]);
+          if (d === 0.0) {
+            return 1;
+          }
+          d1 = dpara(vertex[k], vertex[k1], pt) / d;
+          if (Math.abs(d1) > opttolerance) {
+            return 1;
+          }
+          if (iprod(vertex[k], vertex[k1], pt) < 0 ||
+              iprod(vertex[k1], vertex[k], pt) < 0) {
+            return 1;
+          }
+          res.pen += d1 * d1;
+        }
+      
+        for (k=i; k!=j; k=k1) {
+          k1 = mod(k+1,m);
+          t = tangent(p0, p1, p2, p3, curve.c[k * 3 + 2], curve.c[k1 * 3 + 2]);
+          if (t<-0.5) {
+            return 1;
+          }
+          pt = bezier(t, p0, p1, p2, p3);
+          d = ddist(curve.c[k * 3 + 2], curve.c[k1 * 3 + 2]);
+          if (d === 0.0) {
+            return 1;
+          }
+          d1 = dpara(curve.c[k * 3 + 2], curve.c[k1 * 3 + 2], pt) / d;
+          d2 = dpara(curve.c[k * 3 + 2], curve.c[k1 * 3 + 2], vertex[k1]) / d;
+          d2 *= 0.75 * curve.alpha[k1];
+          if (d2 < 0) {
+            d1 = -d1;
+            d2 = -d2;
+          }
+          if (d1 < d2 - opttolerance) {
+            return 1;
+          }
+          if (d1 < d2) {
+            res.pen += (d1 - d2) * (d1 - d2);
+          }
+        }
+      
+        return 0;
+      }
+    
+      var curve = path.curve, m = curve.n, vert = curve.vertex, 
+        pt = new Array(m + 1),
+        pen = new Array(m + 1),
+        len = new Array(m + 1),
+        opt = new Array(m + 1),
+        om, i,j,r,
+        o = new Opti(), p0,
+        i1, area, alpha, ocurve,
+        s, t;
+      
+      var convc = new Array(m), areac = new Array(m + 1);
+      
+      for (i=0; i<m; i++) {
+        if (curve.tag[i] == "CURVE") {
+          convc[i] = sign(dpara(vert[mod(i-1,m)], vert[i], vert[mod(i+1,m)]));
+        } else {
+          convc[i] = 0;
+        }
+      }
+    
+      area = 0.0;
+      areac[0] = 0.0;
+      p0 = curve.vertex[0];
+      for (i=0; i<m; i++) {
+        i1 = mod(i+1, m);
+        if (curve.tag[i1] == "CURVE") {
+          alpha = curve.alpha[i1];
+          area += 0.3 * alpha * (4-alpha) *
+              dpara(curve.c[i * 3 + 2], vert[i1], curve.c[i1 * 3 + 2])/2;
+          area += dpara(p0, curve.c[i * 3 + 2], curve.c[i1 * 3 + 2])/2;
+        }
+        areac[i+1] = area;
+      }
+    
+      pt[0] = -1;
+      pen[0] = 0;
+      len[0] = 0;
+    
+    
+      for (j=1; j<=m; j++) {
+        pt[j] = j-1;
+        pen[j] = pen[j-1];
+        len[j] = len[j-1]+1;
+    
+        for (i=j-2; i>=0; i--) {
+          r = opti_penalty(path, i, mod(j,m), o, info.opttolerance, convc, 
+              areac);
+          if (r) {
+            break;
+          }
+            if (len[j] > len[i]+1 ||
+                (len[j] == len[i]+1 && pen[j] > pen[i] + o.pen)) {
+              pt[j] = i;
+              pen[j] = pen[i] + o.pen;
+              len[j] = len[i] + 1;
+              opt[j] = o;
+              o = new Opti();
+            }
+        }
+      }
+      om = len[m];
+      ocurve = new Curve(om);
+      s = new Array(om);
+      t = new Array(om);
+    
+      j = m;
+      for (i=om-1; i>=0; i--) {
+        if (pt[j]==j-1) {
+          ocurve.tag[i]     = curve.tag[mod(j,m)];
+          ocurve.c[i * 3 + 0]    = curve.c[mod(j,m) * 3 + 0];
+          ocurve.c[i * 3 + 1]    = curve.c[mod(j,m) * 3 + 1];
+          ocurve.c[i * 3 + 2]    = curve.c[mod(j,m) * 3 + 2];
+          ocurve.vertex[i]  = curve.vertex[mod(j,m)];
+          ocurve.alpha[i]   = curve.alpha[mod(j,m)];
+          ocurve.alpha0[i]  = curve.alpha0[mod(j,m)];
+          ocurve.beta[i]    = curve.beta[mod(j,m)];
+          s[i] = t[i] = 1.0;
+        } else {
+          ocurve.tag[i] = "CURVE";
+          ocurve.c[i * 3 + 0] = opt[j].c[0];
+          ocurve.c[i * 3 + 1] = opt[j].c[1];
+          ocurve.c[i * 3 + 2] = curve.c[mod(j,m) * 3 + 2];
+          ocurve.vertex[i] = interval(opt[j].s, curve.c[mod(j,m) * 3 + 2],
+                                       vert[mod(j,m)]);
+          ocurve.alpha[i] = opt[j].alpha;
+          ocurve.alpha0[i] = opt[j].alpha;
+          s[i] = opt[j].s;
+          t[i] = opt[j].t;
+        }
+        j = pt[j];
+      }
+    
+      for (i=0; i<om; i++) {
+        i1 = mod(i+1,om);
+        ocurve.beta[i] = s[i] / (s[i] + t[i1]);
+      }
+      ocurve.alphacurve = 1;
+      path.curve = ocurve;
+    }
+    
+    for (var i = 0; i < pathlist.length; i++) {
+      var path = pathlist[i];
+      calcSums(path);
+      calcLon(path);
+      bestPolygon(path);
+      adjustVertices(path);
+      
+      if (path.sign === "-") {
+        reverse(path);
+      }
+      
+      smooth(path);
+      
+      if (info.optcurve) {
+        optiCurve(path);
+      }
+    }
+  
+  }
+
+  function process(c) {
+    if (c) {
+      callback = c;
+    }
+    if (!info.isReady) {
+      setTimeout(process, 100);
+      return;
+    }
+    bmToPathlist();
+    processPath();
+    callback();
+    callback = null;
+  }
+
+  function clear() {
+    bm = null;
+    pathlist = [];
+    callback = null;
+    info.isReady = false;
+  }
+  
+  function getSVG(size, opt_type) {
+
+    function safeCoord(pt) {
+      return pt && pt.x != null ? pt : { x: 0, y: 0 };
+    }
+
+    function pathData(curve) {
+      if (!curve || !curve.n) return '';
+      var n = curve.n;
+      var last = curve.c[(n - 1) * 3 + 2];
+      if (!last) return '';
+
+      function bezier(i) {
+        var c0 = safeCoord(curve.c[i * 3 + 0]);
+        var c1 = safeCoord(curve.c[i * 3 + 1]);
+        var c2 = safeCoord(curve.c[i * 3 + 2]);
+        return 'C ' + (c0.x*size).toFixed(3) + ' ' + (c0.y*size).toFixed(3) + ',' +
+                      (c1.x*size).toFixed(3) + ' ' + (c1.y*size).toFixed(3) + ',' +
+                      (c2.x*size).toFixed(3) + ' ' + (c2.y*size).toFixed(3) + ' ';
+      }
+
+      function segment(i) {
+        var c1 = safeCoord(curve.c[i * 3 + 1]);
+        var c2 = safeCoord(curve.c[i * 3 + 2]);
+        return 'L ' + (c1.x*size).toFixed(3) + ' ' + (c1.y*size).toFixed(3) + ' ' +
+                      (c2.x*size).toFixed(3) + ' ' + (c2.y*size).toFixed(3) + ' ';
+      }
+
+      var i;
+      var p = 'M' + (last.x * size).toFixed(3) + ' ' + (last.y * size).toFixed(3) + ' ';
+      for (i = 0; i < n; i++) {
+        if (!curve.c[i * 3 + 2]) continue;
+        if (curve.tag[i] === "CURVE") {
+          p += bezier(i);
+        } else if (curve.tag[i] === "CORNER") {
+          p += segment(i);
+        }
+      }
+      return p;
+    }
+
+    // Check if point (px,py) is inside bounding box of a path
+    function ptInBBox(px, py, p) {
+      return px >= p.minX && px <= p.maxX && py >= p.minY && py <= p.maxY;
+    }
+
+    // Check if hole is contained inside parent using first point of hole
+    function isChildOf(hole, parent) {
+      if (!hole.pt || !hole.pt.length) return false;
+      return ptInBBox(hole.pt[0].x, hole.pt[0].y, parent);
+    }
+
+    var w = bm.w * size, h = bm.h * size,
+      len = pathlist.length, i, strokec, fillc;
+
+    var svg = '<svg id="svg" version="1.1" width="' + w + '" height="' + h +
+        '" xmlns="http://www.w3.org/2000/svg">';
+
+    if (opt_type === "curve") {
+      strokec = "black"; fillc = "none";
+    } else {
+      strokec = "none"; fillc = "black";
+    }
+
+    // Separate positive paths (shapes) from negative paths (holes)
+    var positivePaths = [], negativePaths = [];
+    for (i = 0; i < len; i++) {
+      if (pathlist[i].sign === '+') {
+        positivePaths.push(pathlist[i]);
+      } else {
+        negativePaths.push(pathlist[i]);
+      }
+    }
+
+    // For each positive path, collect its holes (negative paths contained within it)
+    // A hole belongs to the smallest positive path that contains it
+    var usedHoles = {};
+    var groups = positivePaths.map(function(pos) {
+      return { parent: pos, holes: [] };
+    });
+
+    // Sort positive paths by area ascending so smallest container wins
+    groups.sort(function(a, b) { return Math.abs(a.parent.area) - Math.abs(b.parent.area); });
+
+    for (var hi = 0; hi < negativePaths.length; hi++) {
+      var hole = negativePaths[hi];
+      for (var gi = 0; gi < groups.length; gi++) {
+        if (isChildOf(hole, groups[gi].parent)) {
+          groups[gi].holes.push(hole);
+          usedHoles[hi] = true;
+          break;
+        }
+      }
+    }
+
+    // Emit each group as a single compound <path> with fill-rule="evenodd"
+    // This makes holes actually cut through the parent shape
+    var compoundIdx = 0;
+    for (var gi = 0; gi < groups.length; gi++) {
+      var grp = groups[gi];
+      var d = '';
+      try { d = pathData(grp.parent.curve); } catch(e) { continue; }
+      if (!d) continue;
+
+      // Append all hole sub-paths into the same d string
+      for (var hi2 = 0; hi2 < grp.holes.length; hi2++) {
+        var hd = '';
+        try { hd = pathData(grp.holes[hi2].curve); } catch(e) {}
+        if (hd) d += ' ' + hd;
+      }
+
+      svg += '<path d="' + d + '" stroke="' + strokec + '" fill="' + fillc +
+             '" fill-rule="evenodd" class="vpath" data-idx="' + compoundIdx + '"/>';
+      compoundIdx++;
+    }
+
+    svg += '</svg>';
+    return svg;
+  }
+  
+  return{
+    loadImageFromFile: loadImageFromFile,
+    loadImageFromUrl: loadImageFromUrl,
+    setParameter: setParameter,
+    process: process,
+    getSVG: getSVG,
+    img: imgElement
+  };
+})();
+// ── APP LOGIC ──
+var currentFile = null;
+var bwCanvas = null;
+var lastSvgData = null;
+
+var slider      = document.getElementById('thresholdSlider');
+var valLabel    = document.getElementById('thresholdVal');
+var statusEl    = document.getElementById('status');
+var btnConvert  = document.getElementById('btnConvert');
+var btnVectorize= document.getElementById('btnVectorize');
+var btnExport   = document.getElementById('btnExport');
+var bwOutput    = document.getElementById('bwOutput');
+var vecOutput   = document.getElementById('vecOutput');
+var bwPanel     = document.getElementById('bwPanel');
+var vecPanel    = document.getElementById('vecPanel');
+var bwPlaceholder  = document.getElementById('bwPlaceholder');
+var vecPlaceholder = document.getElementById('vecPlaceholder');
+var fileInput   = document.getElementById('fileInput');
+var dropZone    = document.getElementById('dropZone');
+var fileNameEl  = document.getElementById('fileName');
+
+slider.addEventListener('input', function() {
+  var v = parseInt(this.value);
+  valLabel.textContent = v === 0 ? 'Auto' : v;
+});
+
+function setStatus(msg, cls) {
+  statusEl.textContent = msg;
+  statusEl.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+function otsuThreshold(gray) {
+  var hist = new Array(256).fill(0);
+  var N = gray.length;
+  for (var i = 0; i < N; i++) hist[gray[i]]++;
+  var total = 0;
+  for (var i = 0; i < 256; i++) total += i * hist[i];
+  var sumB = 0, wB = 0, max = 0, thr = 128;
+  for (var t = 0; t < 256; t++) {
+    wB += hist[t]; if (!wB) continue;
+    var wF = N - wB; if (!wF) break;
+    sumB += t * hist[t];
+    var mB = sumB / wB, mF = (total - sumB) / wF, b = wB * wF * (mB - mF) * (mB - mF);
+    if (b > max) { max = b; thr = t; }
+  }
+  return thr;
+}
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  currentFile = file;
+  fileNameEl.textContent = file.name;
+  fileNameEl.style.display = 'block';
+  bwOutput.style.display = 'none';
+  bwPanel.classList.remove('white-bg');
+  bwPlaceholder.style.display = '';
+  vecOutput.style.display = 'none';
+  vecOutput.innerHTML = '';
+  vecPanel.classList.remove('white-bg');
+  vecPlaceholder.style.display = '';
+  btnVectorize.style.opacity = '.38';
+  btnVectorize.style.pointerEvents = 'none';
+  btnExport.classList.remove('ready');
+  bwCanvas = null;
+  lastSvgData = null;
+  setStatus('Immagine caricata. Regola la soglia e clicca "Estrai Forme".');
+}
+
+fileInput.addEventListener('change', function() {
+  if (this.files.length) handleFile(this.files[0]);
+});
+dropZone.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', function() { this.classList.remove('drag-over'); });
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault(); this.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) { fileInput.files = e.dataTransfer.files; handleFile(e.dataTransfer.files[0]); }
+});
+
+btnConvert.addEventListener('click', function() {
+  if (!currentFile) return setStatus('Carica prima un\'immagine.', 'err');
+  setStatus('Elaborazione in corso...');
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var scale = 1.5, maxDim = 1600;
+      var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      if (w > maxDim || h > maxDim) { var sc = Math.min(maxDim/w, maxDim/h); w = Math.round(w*sc); h = Math.round(h*sc); }
+
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.fillStyle = 'white'; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+
+      var imageData = ctx.getImageData(0, 0, w, h);
+      var data = imageData.data;
+
+      // ── ESTRAI COLORI DOMINANTI dall'immagine originale (prima della binarizzazione) ──
+      (function extractDominantColors() {
+        var sampleStep = Math.max(1, Math.floor(Math.sqrt(w * h) / 80));
+        var pixels = [];
+        for (var py = 0; py < h; py += sampleStep) {
+          for (var px = 0; px < w; px += sampleStep) {
+            var idx = (py * w + px) * 4;
+            var r = data[idx], g = data[idx+1], b = data[idx+2], a = data[idx+3];
+            if (a < 128) continue;
+            var brightness = (r + g + b) / 3;
+            if (brightness > 240 || brightness < 15) continue; // salta bianchi/neri puri
+            pixels.push([r, g, b]);
+          }
+        }
+        if (pixels.length < 10) return;
+
+        // K-means k=8, 12 iterazioni
+        var K = 8;
+        // Init centroidi con kmeans++ semplificato
+        var centroids = [pixels[Math.floor(Math.random() * pixels.length)].slice()];
+        while (centroids.length < K) {
+          var maxDist = -1, best = null;
+          var sample = pixels.filter(function(_,i){ return i % 4 === 0; });
+          for (var si = 0; si < sample.length; si++) {
+            var p = sample[si], minD = Infinity;
+            for (var ci = 0; ci < centroids.length; ci++) {
+              var dr=p[0]-centroids[ci][0], dg=p[1]-centroids[ci][1], db=p[2]-centroids[ci][2];
+              var d = dr*dr+dg*dg+db*db;
+              if (d < minD) minD = d;
+            }
+            if (minD > maxDist) { maxDist = minD; best = p; }
+          }
+          if (!best) break;
+          centroids.push(best.slice());
+        }
+
+        for (var iter = 0; iter < 12; iter++) {
+          var sums = centroids.map(function(){ return [0,0,0,0]; });
+          for (var pi = 0; pi < pixels.length; pi++) {
+            var p = pixels[pi], minD = Infinity, bestC = 0;
+            for (var ci = 0; ci < centroids.length; ci++) {
+              var dr=p[0]-centroids[ci][0], dg=p[1]-centroids[ci][1], db=p[2]-centroids[ci][2];
+              var d=dr*dr+dg*dg+db*db;
+              if (d < minD){ minD=d; bestC=ci; }
+            }
+            sums[bestC][0]+=p[0]; sums[bestC][1]+=p[1]; sums[bestC][2]+=p[2]; sums[bestC][3]++;
+          }
+          for (var ci = 0; ci < centroids.length; ci++) {
+            if (sums[ci][3] > 0) {
+              centroids[ci] = [sums[ci][0]/sums[ci][3], sums[ci][1]/sums[ci][3], sums[ci][2]/sums[ci][3]];
+            }
+          }
+        }
+
+        // Conta pixel per cluster
+        var counts = new Array(centroids.length).fill(0);
+        for (var pi = 0; pi < pixels.length; pi++) {
+          var p = pixels[pi], minD = Infinity, bestC = 0;
+          for (var ci = 0; ci < centroids.length; ci++) {
+            var dr=p[0]-centroids[ci][0], dg=p[1]-centroids[ci][1], db=p[2]-centroids[ci][2];
+            var d=dr*dr+dg*dg+db*db;
+            if (d < minD){ minD=d; bestC=ci; }
+          }
+          counts[bestC]++;
+        }
+
+        function toHex(v) { var h = Math.round(Math.min(255,Math.max(0,v))).toString(16); return h.length===1?'0'+h:h; }
+
+        var sorted = centroids.map(function(c, i){ return {c:c, n:counts[i]}; })
+          .filter(function(x){ return x.n > 0; })
+          .sort(function(a,b){ return b.n - a.n; })
+          .slice(0, 8);
+
+        var extracted = sorted.map(function(x){
+          return '#' + toHex(x.c[0]) + toHex(x.c[1]) + toHex(x.c[2]);
+        });
+
+        // Aggiungi sempre nero e bianco
+        if (extracted.indexOf('#000000') === -1) extracted.push('#000000');
+        if (extracted.indexOf('#ffffff') === -1) extracted.push('#ffffff');
+
+        paletteColors = extracted;
+        window._paletteFromImage = true;
+      })();
+
+      // Grayscale
+      var gray = new Uint8Array(w * h);
+      for (var i = 0; i < w*h; i++) {
+        gray[i] = Math.round(0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2]);
+      }
+
+      // Soglia
+      var manualThr = parseInt(slider.value);
+      var autoThr = otsuThreshold(gray);
+      var threshold = manualThr === 0 ? autoThr : manualThr;
+      setStatus('Soglia: ' + threshold + (manualThr===0?' (auto)':' (manuale)') + ' — elaborazione...');
+
+      // Rilevamento sfondo
+      var edgeSum = 0, edgeCount = 0, step = Math.max(1, Math.floor(w/50));
+      for (var x = 0; x < w; x += step) { edgeSum += gray[x]; edgeSum += gray[(h-1)*w+x]; edgeCount += 2; }
+      for (var y = 0; y < h; y += step) { edgeSum += gray[y*w]; edgeSum += gray[y*w+(w-1)]; edgeCount += 2; }
+      var isDarkBg = (edgeSum/edgeCount) < threshold;
+
+      // Binarizzazione
+      for (var i = 0; i < w*h; i++) {
+        var isShape = isDarkBg ? gray[i] >= threshold : gray[i] < threshold;
+        var val = isShape ? 0 : 255;
+        data[i*4] = data[i*4+1] = data[i*4+2] = val; data[i*4+3] = 255;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      Potrace.setParameter({ turdsize: 2 });
+
+      // Crop al contenuto
+      var d = imageData.data, minX = w, minY = h, maxX = 0, maxY = 0, found = false;
+      for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+        if (d[(y*w+x)*4] < 128) { if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; found=true; }
+      }
+
+      var finalCanvas = canvas;
+      if (found) {
+        var pad = Math.round(Math.max(w, h) * 0.03);
+        var cx = Math.max(0, minX-pad), cy = Math.max(0, minY-pad);
+        var cw = Math.min(w, maxX+pad) - cx, ch = Math.min(h, maxY+pad) - cy;
+        var cropped = document.createElement('canvas'); cropped.width = cw; cropped.height = ch;
+        var cctx = cropped.getContext('2d'); cctx.fillStyle = 'white'; cctx.fillRect(0, 0, cw, ch);
+        cctx.drawImage(canvas, cx, cy, cw, ch, 0, 0, cw, ch);
+        finalCanvas = cropped;
+      }
+
+      bwCanvas = finalCanvas;
+
+      // Mostra anteprima B&N
+      bwOutput.src = finalCanvas.toDataURL('image/png');
+      bwOutput.style.display = 'block';
+      bwPlaceholder.style.display = 'none';
+      bwPanel.classList.add('white-bg');
+
+      // Carica l'immagine in Potrace (dalla canvas già processata)
+      Potrace.loadImageFromUrl(finalCanvas.toDataURL('image/png'));
+
+      setStatus('✓ Forme estratte — ' + finalCanvas.width + '×' + finalCanvas.height + 'px. Ora clicca "Vettorializza".', 'ok');
+      btnVectorize.style.opacity = '1';
+      btnVectorize.style.pointerEvents = 'auto';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(currentFile);
+});
+
+// ── COLOR EDITOR ──────────────────────────────────────────────────────────────
+var selectedPath = null;        // ultima forma cliccata (singola, legacy)
+var selectedPaths = new Set();  // selezione multipla attiva
+var paletteColors = ['#000000','#ffffff','#e63946','#f4a261','#2a9d8f','#457b9d','#1d3557','#f1faee','#a8dadc','#e9c46a','#264653','#6d6875'];
+
+function buildPalette() {
+  var pal = document.getElementById('palette');
+  pal.innerHTML = '';
+  var labelEl = document.getElementById('paletteLabel');
+  if (labelEl) {
+    labelEl.textContent = window._paletteFromImage ? 'Colori estratti dal logo:' : 'Palette:';
+    labelEl.style.color = window._paletteFromImage ? '#2979ff' : 'var(--text-dim)';
+  }
+  paletteColors.forEach(function(col) {
+    var sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = col;
+    if (col === '#ffffff') sw.style.border = '2px solid #333';
+    sw.title = col;
+    sw.addEventListener('click', function() { applyColor(col); });
+    pal.appendChild(sw);
+  });
+}
+
+function updateHint() {
+  var hint = document.getElementById('colorHint');
+  var n = selectedPaths.size;
+  if (n === 0) {
+    hint.textContent = 'Nessuna forma selezionata';
+  } else if (n === 1) {
+    var el = selectedPaths.values().next().value;
+    var fill = el.getAttribute('fill') || '#000000';
+    hint.textContent = '1 forma selezionata · colore: ' + fill;
+    var safeColor = (fill === 'none' || fill === 'transparent') ? '#000000' : fill;
+    if (/^#[0-9a-f]{6}$/i.test(safeColor)) document.getElementById('customColor').value = safeColor;
+  } else {
+    hint.textContent = n + ' forme selezionate';
+  }
+}
+
+function applyColor(color) {
+  if (selectedPaths.size === 0) return;
+  selectedPaths.forEach(function(el) {
+    el.style.fill = color;
+    el.setAttribute('fill', color);
+  });
+  document.getElementById('customColor').value = (color === 'none' || color === 'transparent') ? '#000000' : color;
+  updateHint();
+}
+
+function clearSelection() {
+  selectedPaths.forEach(function(el) { el.classList.remove('selected'); });
+  selectedPaths.clear();
+  selectedPath = null;
+  updateHint();
+}
+
+function addToSelection(el) {
+  el.classList.add('selected');
+  selectedPaths.add(el);
+  selectedPath = el;
+}
+
+function removeFromSelection(el) {
+  el.classList.remove('selected');
+  selectedPaths.delete(el);
+  selectedPath = selectedPaths.size > 0 ? selectedPaths.values().next().value : null;
+}
+
+function selectOnly(el) {
+  clearSelection();
+  addToSelection(el);
+  updateHint();
+}
+
+// ── RUBBER-BAND (drag to select) ──────────────────────────────────────────────
+function initColorEditor() {
+  buildPalette();
+  var svgEl = document.querySelector('#vecOutput svg');
+  if (!svgEl) return;
+  var vecPanel = document.getElementById('vecPanel');
+  var rb = document.getElementById('rubberBand');
+
+  // Click sui path: click semplice = seleziona solo quella, Shift+click = toggle nella selezione
+  svgEl.querySelectorAll('.vpath').forEach(function(p) {
+    p.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (e.shiftKey) {
+        // Shift+click: toggle
+        if (selectedPaths.has(p)) {
+          removeFromSelection(p);
+        } else {
+          addToSelection(p);
+        }
+        updateHint();
+      } else {
+        // Click normale: seleziona solo questa
+        selectOnly(p);
+      }
+    });
+  });
+
+  // Click su sfondo SVG = deseleziona tutto
+  svgEl.addEventListener('click', function(e) {
+    if (e.target === svgEl) clearSelection();
+  });
+
+  // ── Rubber-band drag ──
+  var isDragging = false, dragStarted = false;
+  // Coordinate client (assolute) del punto di start — usate da clientToSVG
+  var rbClientX0, rbClientY0;
+  // Coordinate relative al panel — usate solo per disegnare il rubber band div
+  var rbPanelX0, rbPanelY0;
+
+  function getPanelRect() { return vecPanel.getBoundingClientRect(); }
+
+  vecPanel.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    if (e.target.classList.contains('vpath')) return;
+    var r = getPanelRect();
+    rbClientX0 = e.clientX;
+    rbClientY0 = e.clientY;
+    rbPanelX0 = e.clientX - r.left;
+    rbPanelY0 = e.clientY - r.top;
+    isDragging = true;
+    dragStarted = false;
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', function(e) {
+    if (!isDragging) return;
+    var r = getPanelRect();
+    var x1 = e.clientX - r.left;
+    var y1 = e.clientY - r.top;
+    var dx = x1 - rbPanelX0, dy = y1 - rbPanelY0;
+
+    if (!dragStarted && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+      dragStarted = true;
+      rb.style.display = 'block';
+      if (!e.shiftKey) clearSelection();
+    }
+    if (!dragStarted) return;
+
+    var left = Math.min(rbPanelX0, x1), top = Math.min(rbPanelY0, y1);
+    var width = Math.abs(dx), height = Math.abs(dy);
+    rb.style.left = left + 'px';
+    rb.style.top = top + 'px';
+    rb.style.width = width + 'px';
+    rb.style.height = height + 'px';
+  });
+
+  // Converti un punto schermo (clientX/Y) in coordinate SVG userspace
+  function clientToSVG(cx, cy) {
+    var pt = svgEl.createSVGPoint();
+    pt.x = cx; pt.y = cy;
+    return pt.matrixTransform(svgEl.getScreenCTM().inverse());
+  }
+
+  window.addEventListener('mouseup', function(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    if (!dragStarted) { rb.style.display = 'none'; return; }
+    rb.style.display = 'none';
+
+    // Converti i due angoli del rubber-band in coordinate SVG usando CTM
+    // (elimina tutti i problemi di offset/scale/padding)
+    var p0 = clientToSVG(rbClientX0, rbClientY0);
+    var p1 = clientToSVG(e.clientX, e.clientY);
+
+    var selX0 = Math.min(p0.x, p1.x);
+    var selY0 = Math.min(p0.y, p1.y);
+    var selX1 = Math.max(p0.x, p1.x);
+    var selY1 = Math.max(p0.y, p1.y);
+
+    svgEl.querySelectorAll('.vpath').forEach(function(p) {
+      try {
+        var bbox = p.getBBox();
+        // Intersezione reale tra bbox forma e rettangolo di selezione
+        var intersects = bbox.x < selX1 && bbox.x + bbox.width  > selX0 &&
+                         bbox.y < selY1 && bbox.y + bbox.height > selY0;
+        if (intersects) {
+          if (e.shiftKey && selectedPaths.has(p)) {
+            removeFromSelection(p);
+          } else {
+            addToSelection(p);
+          }
+        }
+      } catch(err) {}
+    });
+    updateHint();
+  });
+
+  document.getElementById('colorEditor').style.display = 'block';
+}
+
+document.getElementById('customColor').addEventListener('input', function() {
+  applyColor(this.value);
+});
+document.getElementById('btnTransparent').addEventListener('click', function() {
+  applyColor('none');
+});
+document.getElementById('btnResetColors').addEventListener('click', function() {
+  document.querySelectorAll('#vecOutput .vpath').forEach(function(p) {
+    p.setAttribute('fill', 'black');
+    p.style.fill = 'black';
+  });
+  updateHint();
+});
+
+// ── VETTORIALIZZA ─────────────────────────────────────────────────────────────
+btnVectorize.addEventListener('click', function() {
+  setStatus('Vettorializzazione in corso...');
+  btnVectorize.style.pointerEvents = 'none';
+  btnVectorize.style.opacity = '.38';
+
+  setTimeout(function() {
+    try {
+      Potrace.process(function() {
+        var svg = Potrace.getSVG(1);
+        lastSvgData = svg;
+        vecOutput.innerHTML = svg;
+        var svgEl = vecOutput.querySelector('svg');
+        if (svgEl) {
+          svgEl.setAttribute('viewBox', '0 0 ' + svgEl.getAttribute('width') + ' ' + svgEl.getAttribute('height'));
+          svgEl.style.width = '100%';
+          svgEl.style.height = 'auto';
+        }
+        vecOutput.style.display = 'block';
+        vecPlaceholder.style.display = 'none';
+        vecPanel.classList.add('white-bg');
+        btnExport.classList.add('ready');
+        setStatus('✓ Vettorializzazione completata — ' + vecOutput.querySelectorAll('.vpath').length + ' forme. Click per selezionare · Shift+click o trascina per selezione multipla.', 'ok');
+        btnVectorize.style.opacity = '1';
+        btnVectorize.style.pointerEvents = 'auto';
+        initColorEditor();
+      });
+    } catch(err) {
+      setStatus('Errore: ' + err.message, 'err');
+      btnVectorize.style.opacity = '1';
+      btnVectorize.style.pointerEvents = 'auto';
+    }
+  }, 50);
+});
+
+// ── ESPORTA SVG (con colori applicati) ───────────────────────────────────────
+btnExport.addEventListener('click', function(e) {
+  e.preventDefault();
+  if (!this.classList.contains('ready')) return;
+  // Serializza il SVG DOM attuale (con tutti i colori modificati)
+  var svgEl = document.querySelector('#vecOutput svg');
+  var svgData;
+  if (svgEl) {
+    // Rimuove la classe 'selected' prima di esportare
+    svgEl.querySelectorAll('.selected').forEach(function(el) { el.classList.remove('selected'); });
+    svgData = new XMLSerializer().serializeToString(svgEl);
+  } else {
+    svgData = lastSvgData;
+  }
+  var blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'ziply-vettoriale.svg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+});
+</script>
+
+<div style="width:100%;display:flex;justify-content:center;padding:32px 0 24px;margin-top:12px;border-top:1px solid var(--border);">
+  <img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCABaArQDASIAAhEBAxEB/8QAHQABAAICAwEBAAAAAAAAAAAAAAcIBgkDBAUBAv/EAFkQAAEDAwIDBAMICg0JCAMAAAECAwQABQYHEQgSIRMxQVEiYXEJFDI4dYGRsxUYN0JScnSxsrQWIzQ2VmJ2goSSk6HTFyQzNVNXc5TBJ0Njg4WWwtJUldH/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AplSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlZ/o3pHmeql595Y3A5YbagJVxkApjRx61bdVeSU7n5tyAwClXK190JwzSfhnuT9uZNyvzkqIiRdpKR2h3cG6W09zaPUOp8SdqprQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKlLR3QbUHVOAu6Y7FgsWpD5jqnTZIbbCwASAlIUs7BQ6hO3WotrYZ7nn9wR/5bkfVtUGIYPwSWdjs380zCZNV3qjWxkMoB8u0XzFQ/mpNTphGhmlGHhC7PhVsXIQBtJmoMp3f8IKd5uU/i7VI9KDVnxTAJ4hM0SkAAXJQAHh6KajOpN4qPjDZr8pK/RTUZUClKUCsj00w+657nNqxKzJHvu4PhvnUN0tIA3W4r+KlIKj7KxyrG+55PQWtepCJZQHnrHIRE5u8u9oyo7evs0ufNvQW90l0M0704tjDVtscafc0AF26TmUuyFr8SkkbNj1J29e561m9+xjG7/BXBvdgtdyjLGxalRUOJ+gjp7a9elBQXjH4fLdp9FbzbC23G7A8+GZkJSiv3m4rflUlR69mT6OxO4O3U83SsNbQOL56Exw45gZ/IW1xW0ICuu7hebDe3rCuU/NWr+gUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgUpSgV+mkLdcS00hS1rISlKRuVE9wA867+N2pd7vUa1on26AX1bGTPkpYYaHeVLWe4D1bk9wBPSrzcNWHaBYJcIComdY7lGaSVJaakmUhRQ4rpyR29zyk77c3VR8wDtQRvw98JFzvZj5Dqcl612wgLbtCFcsl8eHakf6JP8Uen3/ANXax+zWrH7PHs9kt0a3W+MjkZjx2whCB6gPHxJ7yeprv0oIG48/i53P8ALon1orXBW1LiMx3FMp0umWjM8kTjtnXIZW5OU4hAQpKwUp3X06npVWf8h3Df/v4Z/wCcjf8A8oKp0qTtfsM0+w25WpjAM3RlTEllxcpxLra+wUFAJT6HmCT18qjGgUqbtHOGbUTUSMzdHWG8esjw5m5lwSQt1Pm20PSUPEE8qSO4mpvvfDNonpfiLuS6j5Ne5zDJDaiFpZQ64d9kNtoBWVHY9Oc9ASdgCaCkVKvjpFpvwn6nRH04rY1vzI4JeiSblMaktp7ufk7XZSeo9JO4BIB69K9bKuDbS65MrNkmXuxPkeh2cgPtA+tLgKj8yhQa+KVOWtPDHqBp1Eeu8ZLeSWNlPM7MgtkOMpA6qcZO5SB1JUkqSB1JFQbQKUqUdNtAtUc/tUa82DH0C0yebsp0mU200rlUUnYE8x6gjok91BF1Ktri/BFkj5QvJs1tcBPepuBGXJV7N19mAfXsfnqVsX4OdKbYEqu718vrn3wflhls+wNBKh/WNBr0pWZfsIu2Rar3LDMOtT0yQLnIYjMIO4Q2hxSd1KPRKQAN1E7VfPQrhtwnBMWLOR2q2ZLfZje06TLjJeaQD/3bSVg8qR+FturvOw2ADW1SrkcXnD9pnhuCTM5sEmVj8hDrbLNuSrtmJTqz8FIWeZB2ClHZRGyT6NVAtkGbc7gxb7bDkTJkhYbZYYbK3HFHuSlI6k+oUHWpVpNLODbLr5HauGcXZnGo6wFCG0gSJRHkrYhDf0qI8QKkLPdF+GfR6xRp2c/Zi4rkKKY7L05wyJJG3NyoZ7MbDcbk7AbjruRuFGaVf3TjRjhk1Sxn7N4fY5CWUr7J5sXKUl+Ov8FaFuK2JHUd4PhXTyrgoweY2teOZRe7S8fgpkpblND5gEK2/nGgodWwz3PP7gj/AMtyPq2qqXr7oTk+j4hSrvcLbcbfPdU1GkRVKCuZI3IWhQHKduvQkeurZ+55EHQWQAQSL5IB9X7WzQWNpSlBq04qPjDZr8pK/RTUZVOWsOC5RqFxVZjYMUtbk6Wq4qUs/BbZRyp3W4s9Ep9veeg3JAqdtOeCzGIUVuRneQTLtMIBVGt57COg+I5iCtft9D2UFF6VsuPCvoYY/Z/sNcCttu0+ysvm9v8Apdv7qjnUvguxmZCek4DfJlrngbtxLgvtoyz+Dzgc6Paef2UFF69jCslu+H5VbsmsUj3vcbe8HmFkbjfuKVDxSQSkjxBIr5mONXzEMjl49kduet9ziK5XWXNum43BBHRSSNiCNwQa48WsF5yi/RrDj9ueuNzlFQYjMjda+VJUrbfySkn2Cg2H6ScUemuZWthF8usfFryEgPxrgvkYKum6m3j6BTufvilXf02G9ZzfNZtKLNBVMm6h42ptI35Y1wbkOKHqQ2VKPzCqLWHhR1quhSX8eh2ptW2y5twaHT1pbK1D6N6knFuCG+OlC8nzi3xB3rat0Vb5PqC1lG3t5TQYJxY8QLmqshnHceZeh4rDe7YdqOV2a6AQFrH3qRueVPr3PXYJr/VleLbQ7D9IsIx6Rj71ylzps5xqRJmvBRUkN77BKQlIG/qJ9dVqoFK7FuhTLjOYgW+K/LlyFhtlhlsrW4o9yUpHUn1CrOaWcG2XXxhq4ZxdmcajLAUIbSRIlkeStiEN9PWo+BAoKt0rY5YeEbRm2tJRNtl2vKgOq5lxcQT/AGPZiu5ceFLRCUyW2MXlQVEbdoxdJJUPX+2LUP7qDWvSrn6i8E7IjOysAyp0vJ3UiFdkghfqDyANj5boPrI76qVmuK5BhmRSMfya1v224x9udp0DqD3KSR0Uk+BBINB4tKUoFKlXRzQXONVcelXzGHbQiJFlmI578kqbVzhCVnYBB6bLFZv9ptq5/wDk4z/zzn+HQVzpVh5fB3q+zHW63+x6StI3DTU8hSvUOZAH0kVDOd4TleC3YWvLbFMtEpSeZtL6fRcT5oWN0rHrSTQY9SlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlKBSlZ9ozpPlGrFzn2/F3Lch6Ayl57348pscqlco22SdzvQYDSuWUyuNKdjubc7SyhW3duDsa4qBSpC1o0hyvSaVbI+UuW1a7khxbHvN9TgAQUhXNulO3whUe0ClKUClKUClKUClKUCpA4cPu94P8ALcb6wVH9SBw4fd7wf5bjfWCg2sUpSggbjz+Lnc/y6J9aK1wVsf48/i53P8uifWitcFAq7HB7w4QG7XC1C1At6ZMqQEv2u1vo9BlHel51J+Eo9ClJ6AbE7kjlgXhG09Z1E1nt8G4MB60W1BuNwQoeitCCAhs+fMtSAR4p5vKtnQAA2A2AoFUX90fyl2XnGPYe08r3tb4JmvIB9EuuqKRuPEhDe48gs+Zq9Fa2eOmQt/iTvzSjuI8eI2nr3Ax0K/Oo0EV4Bld4wjMLdlFhkKYnQHg4nr6Lie5SFeaVDdJHka2v4HktvzLDLRlNrVvEucVEhCSQSgkekg7ffJO6T6wa1BVff3OnKnLppfeMWfcK12OeHGQT8FmQCoAf+Yh0/wA6gtDVL+M7h4iw4czUrBIIZbb3dvNtZT6KQT1kNpHcB3rSOgHpDbY1dCvw800+ytl5tDrTiSlaFpBSpJGxBB7xQaaq2a8Fbhc4ZMQURtsmWn6Jj4/6VRLiVwNGnOsd7x2KhSbcpYlW/f8A2Do5kpH4p5kb+PJV6uCX4sWI/wBN/XX6CZqUpQV4wfJNA9GMru9jfy+D+yu6TnXbrLWy4vkWpwq7FTiUlDaUk7cpUOo3V1qf7bOhXKCzPt0yPMiPp52X47gcbcT5pUkkEesVqQ1MUpepGTrUd1KvEsk+Z7ZdZVonrXm2lVxSqyzTLtK1byLVJUVR3N+8pH3iv4ydvXuOlBNPHXk1zznVqxaUYy25NcgKRzx2h/pJjwHKD4ei2U9fDnXv3dLBcNuhVh0nsTcl9ti4ZVIb/wA9uBTv2e46tM7jdKB4nvV3npsBEfAdisjJsiyjWjJEJk3KXNdYhOKHwXF+nIcSPDotKAR3DnFW+oFauOKbOZGe61324qd54MF9Vut6Qd0pYaUUgj8ZXMv+fWzjI5qrbj1yuKfhRYjr49qUFX/StO61KWsrWoqUo7kk7kmgzzQvU+96U5yxkNqJfir2auEIq2RKZ36pPkod6VeB8wSDs/wTK7Hm2Kwcmx2YmXbpqOZtXcpJ7lIUPvVJO4I8xWoOpq4VdbZmlGViHcnXn8UuLgE6ODv2CzsBIQPwgNuYD4SR5hOwT57pR+8fEvlJ76qsg9zr+4VcP5QSPqWKxf3RebEuWnGFXCBJalRJM5x1l5pQUhxCmgQoEd4IrKPc6/uFXD+UEj6ligslSlKCpGsHEjZNKs6ybGsHweO/eVzS7dLlMdKUPSClJ35U+msJ35eqkgbHbodz1tDuMC45DmsHHc9slqhsXF9MePOt3aNpZcUdkhxDi17pJIHMCNu/YjurpxUfGGzX5SV+imo7tTq2bpEeaVyuNvoUk+RCgQaDcfSlKCrfuh2CRLpp5Cz2OylNwsr6I8hwJ6uRnVcoBPjyuFO3lzq86rjwS/GdxH+m/qT9Xj4rYqZnDtmjSkghNv7Xr5oWlY/vTVHOCX4zuI/039SfoNmVKUoKm+6UfvHxL5Se+qqjNXm90o/ePiXyk99VVNcAuFotGbWa7X2K9MtkGa3JkRmgCp9KFBXZ9SBsogJJ8ATQX94Q9ELfpziUbKL7EQvLblHDrq3R+4GlDcMp3+CrbbnPnuO4dc0yvXvSDGJDka653ay+2SlbcPnlqSod4PYpVsfbtVDNcdfs51SkuxZctVpsHNu1aoiyGyPDtVdC6fb037kioloNpGIcQWj+VXNq2WjNYnvx5QS21KYdjc6idgkF1CUknyB3qUK0z1tL4WMgn5RoBiV5ukhcmYuKth11Z3UvsXlsgknvJDY3PiaCTahri30ugai6W3CS1EbOQWZhcu2yAPTISOZbO/iFpBAB7lcpqZa+KAUkpUAQRsQfGg00Urv5DFTBv9xgoBSmPKdaSD4BKyP+lKC2vCxIfi8GWqkmK84w+0u4LbdbUUqQoQWiCCOoIPjVW/2b5p/C/IP/ANk9/wDarP8ADF8SnVj/ANR/UW6qBQZRA1Ez+BJRJhZvkjDyDuFoujwP6XUeqrY6PX5zia0TybCM4ZjysksbaHLdc+QJcK1pX2Th2++CkFK9tgpKh033NUmq43AjAewnT3OdU7+2uLZ/eyUxlODl7dLIWpZTv3jmKUA+Ktx4UFOiCDsRsRWf4Novqjm0JudjmGXKTDcHM3Jd5Y7Lg80rdKUqHsJqSeDnTWwZRcb7qNnSGl41jCC+408ndp54JLhKxtspCEjmKfEqTvuNwfP1S4pNSsovLwxy6O4tZEKKYsSEEpd5B3Fbm3MVbeCSEjy8aDG8m4dtZ8ehLmT8FnOsIG6lQnmpSgPPkaWpX91RWtKkLKFpKVJOxBGxBqWMS4jNYsduTcxGZTrm2lW7ka5H3w04PwTzekB+KQfXUs8QmP41q3obF18xS2t228RlBq/xGUj9sPOEKKtu9SFFKgrvLat1dwACut10/wAyteFw8zn2CSzj80pTHn7pU2sq35e4kj4J7x3jasXq4fDr/wBqHB/mumqwp+42Yrdgt959Ld9gDx6utuD2GqeUGTYFgOYZ5IlMYjYZV3ciISuQGeUdmFEhO5UR37H6K8zKLBeMXv0qw5Bb3rfc4hCX47oHMglIUN9vMEH2GraadTndBOD05q0ltGS5XOZdiBYBPITu2k9O7sUOODfxc28dq8Ljwx+FeoWH6yWJsG33+C0xJUkD4ZR2jKj4lRQVpO/d2QFBVWsoyfT7M8Zxy25Ff7BKt9ruYQYUh0p2eCkc6dgDv8Hr1FfdJMVczfUzHsVbSopuM5tp4pPVLIPM6oexAUfmqdPdA8mF11Qs+C2wbxrBCSnsW9+j7/Krl29TYa2/GNBXLHrJechujVqsNqm3Sc78CPEZU64R4nZIJ2HifCpTi8MOuMiIJKMHWkEbhDlxioWf5pdBHz7VL+od8TwuaY2LDMNjw289vkYS7zdVtJdW0nu2TzDYjn5koB3SAhRI3VvVeJGsmrL8z32vUjKw5vvsi6vIR/USoJ/uoPEzfCctwm4Jg5Xj9wtD69y374aIS4B3lC/grHrSTXnY/aLlf71EstniLmXCY6Go7CCApxZ7gN+lWq4cNWJOsDknRrVwN36Ldo7irdOcQlL7braSvlKgBuQkKUlfwgQQeYHpFWk2MysN4ubFi01fO9a8jTGLgGwcCVHlXt4BSdj89BgMnAczj5wrCF45PVkaCkKt7bfaOjmQFg7J3G3KoK37gD1rOZvDRrdEthuDmDSFtpTzKbZmR3HQP+GlwqJ9QBNS5xa57ddMNWr+1hcluDfslRHlXG5obSp9mMhhtlqO2VA8m6mnHFEdTzN9Ry1EOn3ERqpi+TRLlLy67XqCl5Jlwp8gvoea3HMkc+5Qdu4p22Pq3FBE0hl6NIcjyGnGXmllDjbiSlSFA7EEHqCD4V38ax++ZNdW7Vj1pm3Wc51SxFZU4vbxOwHQDzPQVZXj/wAMgo1Lxe+2GKgS8oYU2420AO3eQpCUr/GUHUDfx5R8/tas5M1wyYJZtONP24rWX3OGmZer0ppK3QCSBy7gg7qCwkHolKe4lXNQRC1wwa4uQvfQwhSRtzBtVxipWR+KXNwfUetRzmeHZThlx+x+U2GfaJB+CmS0UhY80q+CoesE17jusWrDksyVak5aFlXNsm7PJRv+IFcu3q22qwfD5qS9rrGn6O6tJZu5lxHH7VdC0lElp1A37wACoJJUFbA7JUFcwVQVCrNtPtJ9Rc+jqk4lic+4xQrk98+i0yVDvAccKUkjxAPSst0R0efyfiJc09veyotklPqvBbJAW1Hc5FBJ79lrKE7+AXvUn8R3ElkFiymZp/pauLj9msajBXIjR0FbjiPRWlsEFLaEkFI5Rudid9iBQRFk/DtrLjsByfcMHmORm08y1Q3mpRSB3nlaWpWw9lS/7mwCnOcuSoEEW1oEHw/bah+z8Q+s1snIltZ7c5BSQS3KCHm1DyKVpI29mxq13B9e7FnuS33UO3WyJZ73JiIiZDBjdGlyAvmblNp8A6OfmHgpsnqSSQoVfv8AXk/8pc/SNdKu7fv9eT/ylz9I10qC3/ul3+vMI/Jpn6TVQnifD1rFk9ubuNswiYiK4OZDkx5qKVDwIS6pKiD57bVbbjEvFkwi84zqJdLfGu9xtrEiNY7dIG7apjhQffDg8UNJQTsOpWtGxG24qXfOInWW7Tly3c6uMXmJKWoYSw2gHwASB0Hr3ProPEz/AEh1KwOMZeVYjcIMQEAyk8rzCSe4FxsqSN/IkVj2G4tf8xviLHjVucuNxcQpaI7a0pUpKRurbmI32HXbyB8qsjw78S+Sz8rhYVqfIj5BYLyoQC/JYbC2VOHlTzkABxsk8qubqAd9+hBwjXbHH9AuI6NcMT52IjS2rtakKUSEtqUQtknvKeZLiOvXlI3796CH8psF5xe/SbFkFuet1yikB+O8NlI3SFDu6dQQfnrzKtzxs43bc1wbGddsVb54kyM1HuPKOqUq/wBEpW33yV8zSvXyDwqo1B6+IYzfsvvzNixq1v3O5PJUpthkDchKSpR3OwAAHjXFlFhu2M36VYr7DVCuURQS+wpSVFslIUASkkb7EVa/hCtkDS/RPK9c7/HSXnWFx7YlZ2K20K5eVJ/8R/lR/wCXVSr3c516vM28XOQqROnPrkSHVd63FqKlH5yTQdOlKUCpA4cPu94P8txvrBUf1IHDh93vB/luN9YKDaxSlKCBuPP4udz/AC6J9aK1wVsf48/i53P8uifWitcFBdP3NK2Npt+a3hSAXVuxIyFfghIcUoD28yfoFXFqmHuad4aD2Z4+tQDq0xZjQ8SkFxCz8xU39NXPoFa2+OyK5H4kb26v4MmLEdR08AwhH50GtklUP90fsSompePZClBDVxtZjk7dC4y4STv58rqPooKr1aL3OC6Kj6sX60FWzcyyl7bzW082B/c4uqu1PvAQ+WuImA2D0et8pB/qc3/xoNjdKUoKN+6UwWm81xG5hI7WRbnmFHxKW3AofWqqfuCX4sWI/wBN/XX6rf7o3fG5uqljsbTgX9jLV2joH3jjzijt7eVCD84qyPBMCOGLEdxt+7f11+gmWlKUGofUr7ouS/K8r65VY/WQalfdFyX5XlfXKrH6DZ5wd21q2cOOJNtpAU+w7JcI++U48tW5+YgfNUuVEfB3cmrnw44k42RzMMOxnEg/BU28tPX2gA/PUuUHlZlDXcMQvMBtJUuTAfZSB4lTagB/fWnytzFao+IDD3cF1hyTHlMqajtzFvQ9xsFR3Dzt7eeyVAe0GgwOlKUGRTszv07AYGEzJPb2m3TFy4SV7lTClp2WhJ3+AT6W3gdz4mrye51/cKuH8oJH1LFa+a2De51/cKuH8oJH1LFBZKlKUGrTio+MNmvykr9FNRzA/d0f/ip/PUjcVHxhs1+UlfopqOYH7uj/APFT+eg3I0pSgjnic+L/AJv8kPfmqifBL8Z3Ef6b+pP1ezic+L/m/wAkPfmqifBL8Z3Ef6b+pP0GzKlKUFTfdKP3j4l8pPfVVR2Oy9JkNx47TjzzqwhtttJUpaidgAB1JJ8KvF7pR+8fEvlJ76qse9zz0xgTUz9TbxFQ+5GkGFaEuJ3DawkFx4A+PpJSk+Hp+O2wedozwb3S8QWbtqRdH7K06ApFsh8qpPKev7Ys7pbP8UBR69diNqsRjnDZovZGUobwqLOcA9J2e85IUo+ZClco+YAVLlY3qlf3cW02yTJI4BfttrkSWQRuC4htRRv6uYCgrvrTn/Dnpfencdj6VY1kN6ZAEhiPaYoajn8FbikHZXmEg7eOx6VN/D7kVmyzSCx5Bj+NxMatssP9jbIqUBqOUvuIVy8iUp6qSpXRI6qPtrVTLkPy5T0uU8t595anHXFndS1E7kk+JJO9bLeCX4sWI/039dfoJmpSlBqBzv8AfxfvlKR9aqlcmoqEt6g5G2n4KbrKA9gdVSgt1wVzbNbuFrUCfkMFdws8abLdnRUAFT7KYbJWgAkA7p3HUjvrE/8AK1wpf7l7n/yrP+PXp8MXxKdWP/Uf1FuqgUFr29aeGK2q992vRF96Wg7tplRI5Rv6+Zxe39U1GmvXEDk2qMJmwswY+O4wwUlu1xVcwWU/BLi9hzAeCQEpHToSAahulBbzh9/zrgW1NiW/92NvzHHkpPpFHvdhRPs5EqHzGqh1M/Clq/G0uyybEv7KpOLXxpLFybSjnLZG4S6E/fABSgpPilR7yAKkXL+E9OSuryTRvL7HdrBMUXWI8iSeZkHryJcSlQVsdxsrlI22O5BNBVOrd8PG8Pgb1Qk3DZMR92amOF9xWYzKAR/PKR7RWPY/wb5yZPvjLsix6w2hr0pEhL6nlpT5gFKU/OVDb11wcSup2HwtO7ZolpbI9949bSkz7ilW6ZTiVFXKlQAC91krUsdCduXoKDyeBHL/ANjWusW2PuhEO/xlwFhR6dr8No+3mTyj8c1wZno8/I4vZGm8NlTUG43X302UdA3CcHbLKfxEc6R607VC+P3WXY79b71b18kuBJblMK8loUFJP0gVsnuoxiPcftk1uNqhtYXytNffq5ldsn1c5Cuz891bUFXOPnMmLnqNb8EtXI1asWiJa7JsbJD7iUkgeGyWw2keR5qzLhyUjV/hWyvSWU4hy72cF21hZAICiXWep7h2qVpJ8Er28aqVkN2m36/XC93J3tZtwkuSpC/wnFqKlH6Sak3hGzr9get9nlSHuzttzV9jZ25ISEOkBKj+KsIV7AaCSPc98YaGcZHnV2CWIeOwC1zup27N1zcqV6uVttwH8eoaOVjJ+IFjMboohmdkjUxwL/7tkyEkJ9iUAD5qt5xAwoOi2guetWp1tEnNb86Y4b9EtpkpSXEbeSW0OgbdBzDu3qgoJB3B2IoLu8ZF+0os2qEJrPtNrnkVwdtLS2JrF3djI7LtHQG+VJA3Cgo/zhUKfs34bv8Aclev/cj/AP8AapIhTsU4otN7PYL1kEXHtS7A0Wo70s+hcUcoB26jm5uVJIG6kEKIBB64JK4QtZGZRZbh2WSgHbtm7ikIPr9IBX91B62mupOjVmzSBd8I0NyR2/RCtyKI15fkLHoFKj2fpbjlJ8K8XGMkdy7jatORv2aTZXZt/YUqDIBDrBSlKdlAgdfR3PTxqT9LMEx7hhRNz/U7I7bJyRcNbNrstvdK3CFbbkbgEqO3LzbciQTuTuNoS0ayCXlfFhYMmnpSiTdMjEtxCfgoK1lXKPUN9h7KD3OPQk8Rdz3PdBibf2YqBannjz+MZc/yGJ9UKgaglTC9Q8ny/WHTpebX1+6xbVfYYY98BIDKC+1zdwHTZCd9/Kp/4u7/AKQ2bVwsZ1plc7/dHbcw6mazeHY6FtbqSkBCSB0KVDeqXNrW24lxtSkLSQUqSdiCPEVb+W9iXFXgtnYkX2BjuqNoa7DklHlanp6b8u3UpUfSATupBKhykHchGP7N+G7/AHJXr/3I/wD/AGrKdK9TtIbBmkW84Fobkjt+iocLPva7vSlhKkFCz2Z5gRyqI326b14T/CHrK3JLSIFmdQFbdsi4p5CPPqArb5t6lDTHE8Y4WYdzzTUPJbdPy2TCVGgWa3ula+VRCj3gE8xSjdZSEpAPUkigcHmRt5NxSajXqRb3rZMuER54Q3+jrAElsLQrfb0gSkHp3jwqpefsyY+d5BHmJUmS1c5KHgobELDqgrf596yvTbVW64nrenUt1rt3pM96RcY7Z2Dzb6lF1I38fSJG/iBVi9TNDMX15lr1J0hy21tSbjs5cIMvmSjttuqlcoKml93MkpIJ6g9eoUuq3nuabMo5JmchKVe9Ew4yFnbpzlayke3YKrE4fB1qSh1bt8veLWi3MjmfluTFqCEeKgOQDp6ykeupk4T7rh1r1QmabaeTnLnZLVZX5Vwuqun2TnqfjoLiR3dmhA5U7dPSVtvvzKCjF+/15P8Aylz9I10q7t+/15P/AClz9I10qC5PumDMsvYLI2WYgTORv96lwlg/SQP7jVNqvzxcXXD5eoNqwHUKU7AsF7taXY9zbHMq2TW3XA29t19BSVqQv1FJJHLuIWncHeoq1pkY9fsWvdse9KPLalrR2iD3KI5CP6qle2gr/jbMmRkVtjwgoynZbSGQnv5ysBO3z7VaD3Sd2OrPcUYTy++UWtxbnnyKdIT/AHpXXvaY8PuP6LT2dSdYsutCU2pfbQocYqU2p4DdKt1JC3FpPUIQnvAO5A2qt+vuokjVDU645U404xFXsxAYWd1NR0b8gPhudyogdN1GgnXgkya35diGTaFZQ6VQrlFdft256p5h+2oT6weV1I8ws1AkTTLIXdaEaWuMlN2+yfvFagkkBIO5eH8Tk3c3/B614ODZJcsPy+1ZPaHOSbbZKJDXXorY9Un+KobpPqJrYg7/AJPWXXOKQOlTasYCQzsOq9+h3/2x6Mbd3hQV/wCOvLIFoYx3RbGNmLRYYrT0tCFd6wjlZbVt3lKN1nfvLgPeKqrXrZlkNyyzKrnkt3d7WdcpK5Dx8AVHflHkkDYAeAAFeTQKUpQKzTQqW3B1qwmW6vkbbv0IrVvtsnt0An6Kwuv2y64w8h5lam3G1BSFpOxSQdwQfOg3K0qP9AtSbbqhpxb8gjSGTcEtJaukZB9KPIA9IEeCSRzJ8wR66kCghrjRsc6+8O2QtW5lb78QszC2gblSG3UlZ+ZHMr+bWs0Ak7Abk1uXrDLljGmGIe/M0m41i1nXFSX5FzNuZbWjbqVc4Tzbk+XUnbvNBQ7SKNmeg+UYhqdkttdt1jvL7kJ6O6eWQ5GISVLLZ6gdUrT4ktjuBG+x6DKjToTE2G+3IjSG0usutqCkOIUN0qSR0IIIINawuJvVuVq1qAq4tpcYsdvCo9qjq7w2T6TivJS9gSPABI67b1I3CZxIqwNtnDM4defxkq/zSYAVuW8nrykDcqaJ8B1T123HQBf2q98e2GqyTRJd6jM9pMx2SmYNhuosK9B0D1DdKz6m6nmzXS23m2s3O0XCLcIT6eZqRGdS42seYUkkGvt3t8O7WqXarjHRIhzGFsSGlj0XG1pKVJPqIJFBpxqwfABEck8QjDyEkpi2uU8sjwBCUfnWKjXW3Ta96XZ3Mx26sOmNzqXb5ZT6Epjf0Vg92+2wUPA7jyqz3ucmCzIkO/agToy2WpqE263qWkjtEBXO8ob96eYNgHzSoeFBcGvKy/IbTimM3DI75KTFt1vYU8+4fIdwHmonYAeJIHjX4zHKMfw+wv33JrrGtlvYHpvPq23PglI71KPgkAk+ArXlxSa/XHVa6fYezh+34lEc5mWFHZyWsdzroHT8VPhvv1PcEYanZdcM8z68Zdc+ki5SS6Eb7hpsei22D5JQEpHsrYpwYEK4Z8QKSCOzlDp+VvVrHrZlwS/FixH+m/rr9BM1KUoNQ+pX3Rcl+V5X1yqx+sg1K+6LkvyvK+uVWP0Fxvc69RY8d66aaXKQlC5KzcLXzq+GsJAebHr5UpWAPJZq6Vac7Lc7hZbvEu1qluw58N1L0d9pWym1pO4IrY7w0cQNg1StTFpubzNsy5loB+ItQSmWQOrjH4Q6blHenr3gb0E31BPFxoadV7BGulh97s5TbElLBcISmWyepZUrwIPVJPQEkdOYkTtSg0/ZZjGQ4ndl2rJbNOtM1B6tSmSgkeaSeih6xuDXzF8byDKLm3bMds066zHDsGorCnCPWdu4es9BW32XFjTGSzLjsyGidyh1AUn6DXXfctdjtT0l1US22+MhTrqzytNNJA3KiegA9dBSFWh8TR7h+yjOM9TGeyudBVb7fD5g4iEZH7Wdj3Kd5VLJI3CQDsT31LPudf3Crh/KCR9SxVcuMDW1OqeUM2iwuOpxa0LV73J3Hvx7uL5T4DbokHqASenMQLG+51/cKuH8oJH1LFBZKlKUGrTio+MNmvykr9FNRzA/d0f/AIqfz1I3FR8YbNflJX6KajmB+7o//FT+eg3I0pSgjnic+L/m/wAkPfmqifBL8Z3Ef6b+pP1evidITw/ZsVEAfYl0daopwS/GdxH+m/qT9BsypSlBU33Sj94+JfKT31VZ/wACbsdzhusiGSOduVLS9+P26z+iU1gHulH7x8S+Unvqqwz3P7VW32G4ztOb9MbjR7pIEm1uuHZPvkgIW0T4FYSjl9aSO9QoLy14mf2BGV4NfcZccDSbrb34faEb9mXEFIVt6iQfmr26UGnzLcevGKZHNx+/wXYVxhOlt5lwbEHwI80kbEEdCCCK2M8D6lnhmxcK7krmBPTw99vH85NSFqLbcDVZZGQZ3ZrFMg2tlTy5FzgtvhlCep5edJO/kB1JIA6msZ4ddUbHqji1ynWK1ptUa2XFcNqJsAQyEhTbnKnonmBPQdxBHXbchJ1KUoNRGpiVI1IydChspN4lgjyPbLpXs8QVofseuGaW6QgoUm8yXkA/7NxZcbPzoWk/PSgwtuVKaYXHbkvIZXvzNpWQlW/mO41w0pQKUpQK7tou91s8gyLRc5tvePe5FfU0r6UkGulSg9W9ZJkV7QlF5v11uSUndKZcxx0D+sTXlUpQK51TJio3vVUt8sbbdkXDy+fd3VwUoFfQSDuDsRXylBzyZkyUkJky33wk7gOOFW301wUpQK9+NmuZRogiRstv7MYDYNN3F5KAPxQravApQckl9+S+t+S8488s7rccUVKUfMk9TXxpxxpxLjTim1pO6VJOxHz1+KUHI+89IdLr7rjrh71LUVE/Oa46UoFfQSDuDsRXylBkDOb5mzFERnLr+3HA2DSbk8EAezm2rwnnXX3lvPOLccWSpa1qJUonvJJ7zX4pQK7NtuE+2S0y7bOkwpKfgvR3VNrHsUkg11qUHr3nJ8lvTIZvOQ3e5NDuRLmuOpHzKJrzY0mTGWVxpDrKiNiW1lJI+auKlB9JJO5O5NfKUoOWTJkyVhcmQ68oDYFxZUQPnr0LLkuR2RCm7Lf7rbUL+EmJMcZB9vKRXlUoO3dLlcbpJ983OfKnP7bdpIeU4rby3USa6lKUE749wn6wXZcNblstsGHKShfvl64NqShCgDzFKCVdx7gKzHjCyyx4rguOaDYdOS/Fs7aHLu60RyqcTvytq2PwysqdUPAlHed9odvuo2oRsDUQ55lPvdQS2Wvsu/yFHKfR259tvVUdEkncncmg+UpSgUpSgUpSgyTT7OcswG9i8Yle5NrlEBLnZkFt5P4LiDulY9Sgdu8daspinG7f40ZDWT4Rb7k4AAp+DLVGJ9ZQpKwT7CB7KqPSguLf+OGYuMpFh0+jsPkei7NuJdSD60IQkn+sKrvqzq7nmp8pteVXhTsVlXMxBjp7KM0fMIHef4yiT66wKlApSlBmOnGp+d6eSS7iORzLe2tQU5G3Dkdw+amlbpJ8N9t/XVhMT43MkisoayjC7bc1DYF6DKXFJ9ZSoOAn2ED2VUqlBc3I+MLBMhtyYl+0m+zDSFc6Y891h5oK26EBbZ2Pf12rGMn4z8qcgiBh2H2bHmEI7NpTqzJU0nbYcgAQgbeRSRVWaUGQZ1muV5zdzdcsvsy6yuvKXl+g2D4IQNkoHqSAKx+lKBU8aVcUWb6dYFbcNtFjx6VCt/a9k7KaeLqu0dW6dylwDvWQNh3AVA9KC0H27GpP8GsS/sZH+NT7djUn+DWJf2Mj/Gqr9KDu324vXe9z7tIQ2h6bJckOJbBCQpaiogb7nbc10qUoFfth52O+2+w6tp1tQW24hRSpKgdwQR3EHxr8UoLB6ccW2qGLx24V4ch5TDQAkG4ApkAD/wAZOxUfWsKNStD44rSpkGXp5Nad8UtXNK0/SWx+aqTUoLj3/jhkKaUiwafNNubei7NuJWP6iED9Kq/ata16h6nftGS3rltoXzotsNHYxknw3SOqyPArKiPA1HNKBUzaJcRWX6T4k/jVitFjmxXpq5hXNbdUsLUhCSByOJG2yB4b9TUM0oLQfbsak/waxL+xkf41Pt2NSf4NYl/YyP8AGqr9KD3tQspnZrml1yu5MR2JlzfL7rccKDaVEAbJCiTt08Sa8JClIWFpOykncHyNfKUFpvt2s+/gnjP0P/4lPt2s+/gnjP0P/wCJVWaUFh9ROLHM82wm7YpPxywRotzYLDrrAe50AkHcbrI36eIqItJs2uGnOoFszK1xIsuZb+17NmTzdmrtGltHflIPQLJ7+8CsVpQWm+3az7+CeM/Q/wD4lPt2s+/gnjP0P/4lVZpQS7rxr3ker9otttvdmtMBu3vqfbVDDm6ipPLseZR6VEaSUqCkkgg7gjwr5SgsPpXxbaiYhCZtl9aj5ZAZHKhUxxSJQT5dsN+b2rSo+upOf444PvPmY05kmUR8Fd2SEA+0Nbn6BVKqUEq6368ZzquUxLw+zb7M2vnbtkIFLRUO5SySStQ9fQeAFdbQTWbJNHrncpVjiQZ0e5NIRJjSwrlJQSULBSQQocyh4jZR6d20Z0oLVOcbecFP7Xh+OpO/epTx/wDkK4/t2s+/gnjP0P8A+JVWaUEiau6oK1My79k97xe1Rp6o6GHDEcdQlzk32UrdR3VsQnfySKVHdKD/2Q==" alt="Powered by Torchia" style="height:28px;opacity:0.7;">
+</div>
+</body>
+</html>
