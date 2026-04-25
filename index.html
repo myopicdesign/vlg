@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ziply — Vettorializzatore</title>
+<title>Estrattore</title>
 <style>
 :root {
   --bg: #0a0a0a; --surface: #111; --surface2: #161616;
@@ -69,6 +69,99 @@ input[type=range] { flex: 1; accent-color: var(--blue); height: 3px; cursor: poi
 </div>
 
 <div class="wrap">
+
+
+  <!-- GUIDA POPUP -->
+  <div id="guideOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#141414;border:1px solid #2a2a2a;border-radius:16px;max-width:620px;width:100%;max-height:88vh;overflow-y:auto;padding:32px 36px;position:relative;">
+      <!-- Close -->
+      <button onclick="document.getElementById('guideOverlay').style.display='none'" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#555;font-size:22px;cursor:pointer;line-height:1;padding:4px 8px;">✕</button>
+
+      <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#2979ff;margin-bottom:8px;">Guida</div>
+      <h2 style="font-size:18px;font-weight:700;color:#e8e8e8;margin-bottom:24px;line-height:1.3;">Come migliorare la qualità di un logo con l'AI</h2>
+
+      <!-- Step 1 -->
+      <div style="margin-bottom:22px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <div style="width:24px;height:24px;border-radius:50%;background:#2979ff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div>
+          <div style="font-size:13px;font-weight:600;color:#e8e8e8;">Preparazione e caricamento del logo</div>
+        </div>
+        <p style="font-size:13px;color:#888;line-height:1.7;margin-bottom:14px;">Carica su <strong style="color:#ccc;">Gemini</strong> o <strong style="color:#ccc;">ChatGPT</strong> il logo in bassa risoluzione (anche pixelato o sfocato va bene). Allega l'immagine e utilizza il seguente prompt:</p>
+        <!-- Prompt box -->
+        <div style="background:#0d0d0d;border:1px solid #2a2a2a;border-radius:10px;padding:16px 18px;position:relative;">
+          <p id="guidePromptText" style="font-size:12px;color:#b0b0b0;line-height:1.75;margin:0;padding-right:36px;font-style:italic;">"Ricrea questo logo mantenendo fedelmente ogni dettaglio del design originale (forme, proporzioni, colori e tipografia), ma in alta risoluzione. Rimuovi qualsiasi effetto di sfocatura, pixelatura o distorsione, ottenendo un risultato pulito, nitido e ben definito. Il logo finale deve apparire professionale, con bordi precisi e qualità adatta alla stampa e all'uso digitale."</p>
+          <button id="copyPromptBtn" onclick="copyGuidePrompt()" title="Copia prompt" style="position:absolute;top:12px;right:12px;background:#1e1e1e;border:1px solid #333;border-radius:7px;color:#888;cursor:pointer;padding:5px 8px;font-size:11px;display:flex;align-items:center;gap:5px;transition:background .15s,color .15s;">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Copia
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div style="margin-bottom:22px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <div style="width:24px;height:24px;border-radius:50%;background:#2979ff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+          <div style="font-size:13px;font-weight:600;color:#e8e8e8;">Generazione del logo in alta qualità</div>
+        </div>
+        <p style="font-size:13px;color:#888;line-height:1.7;margin:0;">L'intelligenza artificiale elaborerà l'immagine e ti restituirà una versione del logo in alta risoluzione, più nitida e pulita rispetto all'originale, correggendo i difetti dovuti alla bassa qualità.</p>
+      </div>
+
+      <!-- Step 3 -->
+      <div style="margin-bottom:28px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <div style="width:24px;height:24px;border-radius:50%;background:#2979ff;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</div>
+          <div style="font-size:13px;font-weight:600;color:#e8e8e8;">Utilizzo del file finale</div>
+        </div>
+        <p style="font-size:13px;color:#888;line-height:1.7;margin:0;">Scarica il logo generato e caricalo nel passaggio successivo. Segui la procedura guidata indicata nella guida ufficiale che hai acquistato per completare l'utilizzo del file.</p>
+      </div>
+
+      <button onclick="document.getElementById('guideOverlay').style.display='none'" style="width:100%;height:42px;border-radius:10px;border:none;background:#2979ff;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Chiudi guida</button>
+    </div>
+  </div>
+
+  <script>
+  var PROMPT_TEXT = "Ricrea questo logo mantenendo fedelmente ogni dettaglio del design originale (forme, proporzioni, colori e tipografia), ma in alta risoluzione. Rimuovi qualsiasi effetto di sfocatura, pixelatura o distorsione, ottenendo un risultato pulito, nitido e ben definito. Il logo finale deve apparire professionale, con bordi precisi e qualità adatta alla stampa e all'uso digitale.";
+  function copyGuidePrompt() {
+    var btn = document.getElementById('copyPromptBtn');
+    function showCopied() {
+      btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="#30d158" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Copiato';
+      btn.style.color = '#30d158';
+      btn.style.borderColor = '#30d158';
+      setTimeout(function() {
+        btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copia';
+        btn.style.color = '#888';
+        btn.style.borderColor = '#333';
+      }, 2000);
+    }
+    // Metodo 1: clipboard API moderna
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(PROMPT_TEXT).then(showCopied).catch(function() { fallbackCopy(); });
+    } else {
+      fallbackCopy();
+    }
+    function fallbackCopy() {
+      var ta = document.createElement('textarea');
+      ta.value = PROMPT_TEXT;
+      ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); showCopied(); } catch(e) {}
+      document.body.removeChild(ta);
+    }
+  }
+  document.getElementById('guideOverlay').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+  });
+  </script>
+
+  <!-- Bottone apri guida -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+    <button onclick="document.getElementById('guideOverlay').style.display='flex'" style="display:flex;align-items:center;gap:7px;height:34px;padding:0 16px;border-radius:8px;border:1px solid #2979ff;background:rgba(41,121,255,0.08);color:#2979ff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s;">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      Come migliorare la qualità del logo
+    </button>
+  </div>
 
   <div class="step-label"><span>01</span>Carica immagine</div>
   <div class="upload-row">
